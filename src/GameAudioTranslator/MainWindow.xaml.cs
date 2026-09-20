@@ -5,7 +5,9 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using GameAudioTranslator.Models;
 using GameAudioTranslator.Services;
 using NAudio.Wave;
@@ -14,6 +16,8 @@ namespace GameAudioTranslator;
 
 public partial class MainWindow : Window
 {
+    private static readonly Brush RecordingBrush = new SolidColorBrush(Color.FromRgb(0xCC, 0x33, 0x33));
+
     private readonly ObservableCollection<CaptionLine> _captions = new();
     private readonly ObservableCollection<AudioDeviceOption> _devices = new();
     private readonly ObservableCollection<ProcessAudioSource> _processes = new();
@@ -131,6 +135,7 @@ public partial class MainWindow : Window
     private void LoadSettingsIntoUi()
     {
         SensitivitySlider.Value = _settings.SilenceThresholdRms;
+        SpeechSpeedSlider.Value = _settings.ReplySpeechSpeed;
         _apiKey = SettingsStore.DecryptApiKey(_settings.EncryptedApiKey);
         if (!string.IsNullOrEmpty(_apiKey))
         {
@@ -322,8 +327,33 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() => _overlay?.ToggleLock());
     }
 
+    private void ReplyButton_Click(object sender, RoutedEventArgs e) => ToggleReplyRecording();
+
+    private void ReplayButton_Click(object sender, RoutedEventArgs e)
+    {
+        _replyVoice.Replay();
+        StatusText.Text = "Status: replaying last reply";
+    }
+
+    private void SpeechSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (SpeechSpeedLabel == null)
+        {
+            return; // fires once during InitializeComponent before this is assigned
+        }
+
+        SpeechSpeedLabel.Text = $"{e.NewValue:0.0}x";
+        _settings.ReplySpeechSpeed = e.NewValue;
+        SettingsStore.Save(_settings);
+    }
+
     private void ToggleReplyRecording()
     {
+        if (!ReplyButton.IsEnabled)
+        {
+            return; // still processing the previous reply
+        }
+
         if (!_isRecordingReply)
         {
             StartReplyRecording();
@@ -359,23 +389,29 @@ public partial class MainWindow : Window
         }
 
         _isRecordingReply = true;
-        StatusText.Text = $"Status: recording your reply (will speak in {Capitalize(_lastSpokenLanguage)})... press Ctrl+Alt+R to stop";
+        ReplyButton.Content = "■ Stop Reply";
+        ReplyButton.Background = RecordingBrush;
+        StatusText.Text = $"Status: recording your reply (will speak in {Capitalize(_lastSpokenLanguage)})... press Ctrl+Alt+R or click Stop Reply";
     }
 
     private async Task StopReplyRecordingAndSpeakAsync()
     {
         _isRecordingReply = false;
+        ReplyButton.IsEnabled = false;
+        ReplyButton.Content = "Working...";
+        ReplyButton.ClearValue(Button.BackgroundProperty);
+
         var targetLanguage = _lastSpokenLanguage;
         var recording = _micRecorder.StopAndTakeRecording();
 
-        if (recording == null || string.IsNullOrWhiteSpace(targetLanguage) || string.IsNullOrWhiteSpace(_apiKey))
-        {
-            StatusText.Text = "Status: didn't catch anything";
-            return;
-        }
-
         try
         {
+            if (recording == null || string.IsNullOrWhiteSpace(targetLanguage) || string.IsNullOrWhiteSpace(_apiKey))
+            {
+                StatusText.Text = "Status: didn't catch anything";
+                return;
+            }
+
             StatusText.Text = "Status: transcribing your reply...";
             var wav = AudioConverter.ConvertToWav16kMono(recording.Value.Data, recording.Value.Format);
             var transcription = await _translationService.TranscribeAsync(wav, _apiKey, languageHint: "en");
@@ -396,12 +432,19 @@ public partial class MainWindow : Window
             }
 
             StatusText.Text = $"Status: generating speech in {Capitalize(targetLanguage)}...";
-            await _replyVoice.SpeakAsync(translated, _apiKey);
+            await _replyVoice.SpeakAsync(translated, _apiKey, _settings.ReplySpeechSpeed);
             StatusText.Text = $"Status: spoke reply in {Capitalize(targetLanguage)}";
+            ReplayButton.IsEnabled = true;
         }
         catch (Exception ex)
         {
             StatusText.Text = $"Status: reply failed ({ex.Message})";
+        }
+        finally
+        {
+            ReplyButton.Content = "Start Reply";
+            ReplyButton.ClearValue(Button.BackgroundProperty);
+            ReplyButton.IsEnabled = true;
         }
     }
 

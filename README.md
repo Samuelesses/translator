@@ -80,10 +80,8 @@ The output lands in
    - **Ctrl+Alt+O** — show/hide the overlay
    - **Ctrl+Alt+L** — unlock the overlay so you can drag it somewhere else
      on screen; press it again to lock it back into click-through mode
-   - **Ctrl+Alt+R** — reply: press once to start recording your mic, speak
-     your reply in English, press again to stop. It's translated into
-     whatever language was last heard and spoken out loud through your
-     speakers so you can hear and repeat it (see "Replying" below).
+   - **Ctrl+Alt+R** — same as clicking the **Start Reply** button (see
+     "Replying" below); works even when the app doesn't have focus
 
 ### Capturing a specific application
 
@@ -108,12 +106,27 @@ device for everything else.
 
 ### Replying
 
-Ctrl+Alt+R lets you talk back: it records your microphone, transcribes
-your English speech, translates it into whichever language the app most
-recently heard (shown live as "Last language heard" under the status
-line), and speaks the translation out loud through your speakers using
-OpenAI's TTS API (`tts-1`) — natural-sounding speech in any language
-automatically, no Windows voice packs or setup required.
+The **Reply** panel lets you talk back. Click **Start Reply** (or press
+**Ctrl+Alt+R**) to start recording your mic — the button turns red and
+changes to "■ Stop Reply" so it's obvious it's listening. Speak your
+reply in English, then click it again (or press the hotkey again) to
+stop. While it processes, the button shows "Working..." and is disabled
+so you can't double-trigger it; the status line tracks each step
+(transcribing → translating → generating speech).
+
+The reply is translated into whichever language the app most recently
+heard (shown live as "Last language heard" above the button) and spoken
+out loud through your speakers using OpenAI's TTS API (`tts-1`) —
+natural-sounding speech in any language automatically, no Windows voice
+packs or setup required.
+
+- **Speech speed** slider (0.5x–2.0x) controls how fast the reply is
+  spoken — slide it down if you want more time to read along and repeat
+  it out loud.
+- **Replay** re-plays the last generated reply instantly, at no extra
+  API cost — it reuses the audio already generated rather than calling
+  the TTS API again. It's disabled until you've successfully generated
+  at least one reply.
 
 This is **local playback only** — it plays through your speakers for you
 to hear and repeat, it does not inject audio into your microphone or game

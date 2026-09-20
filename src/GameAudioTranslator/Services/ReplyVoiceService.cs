@@ -18,16 +18,35 @@ public class ReplyVoiceService : IDisposable
     private WaveOutEvent? _player;
     private MemoryStream? _playbackStream;
     private RawSourceWaveStream? _playbackReader;
+    private byte[]? _lastPcmBytes;
+
+    /// <summary>True once at least one reply has been generated and can be replayed without another API call.</summary>
+    public bool HasReply => _lastPcmBytes != null;
 
     public ReplyVoiceService(SpeechTranslationService translationService)
     {
         _translationService = translationService;
     }
 
-    public async Task SpeakAsync(string text, string apiKey, CancellationToken ct = default)
+    /// <summary>Generates speech via the API (costs a call) and plays it.</summary>
+    public async Task SpeakAsync(string text, string apiKey, double speed, CancellationToken ct = default)
     {
-        var pcmBytes = await _translationService.TextToSpeechAsync(text, apiKey, ct).ConfigureAwait(false);
+        var pcmBytes = await _translationService.TextToSpeechAsync(text, apiKey, speed, ct).ConfigureAwait(false);
+        _lastPcmBytes = pcmBytes;
+        Play(pcmBytes);
+    }
 
+    /// <summary>Replays the last generated reply, if any, at no extra cost - no new API call.</summary>
+    public void Replay()
+    {
+        if (_lastPcmBytes != null)
+        {
+            Play(_lastPcmBytes);
+        }
+    }
+
+    private void Play(byte[] pcmBytes)
+    {
         StopPlayback();
 
         var stream = new MemoryStream(pcmBytes);

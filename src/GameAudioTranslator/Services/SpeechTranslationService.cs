@@ -131,14 +131,16 @@ public class SpeechTranslationService
     /// length must be non-negative..."). Raw PCM has no header to get wrong - the
     /// caller just needs to already know the fixed format above.
     /// </remarks>
-    public async Task<byte[]> TextToSpeechAsync(string text, string apiKey, CancellationToken ct = default)
+    /// <param name="speed">Playback speed, 0.25-4.0 (OpenAI's valid range); values outside it are clamped.</param>
+    public async Task<byte[]> TextToSpeechAsync(string text, string apiKey, double speed = 1.0, CancellationToken ct = default)
     {
         var requestBody = new JsonObject
         {
             ["model"] = TtsModel,
             ["voice"] = TtsVoice,
             ["input"] = text,
-            ["response_format"] = "pcm"
+            ["response_format"] = "pcm",
+            ["speed"] = Math.Clamp(speed, 0.25, 4.0)
         };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, SpeechEndpoint)

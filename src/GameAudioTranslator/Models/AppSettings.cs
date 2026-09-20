@@ -14,4 +14,6 @@ public class AppSettings
     public double OverlayLeft { get; set; }
     public double OverlayTop { get; set; }
     public bool OverlayPositionSet { get; set; }
+
+    public double ReplySpeechSpeed { get; set; } = 1.0;
 }
