@@ -1,0 +1,48 @@
+<Window x:Class="GameAudioTranslator.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Game Audio Translator" Height="600" Width="480"
+        MinHeight="520" MinWidth="420">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="OpenAI API Key:" VerticalAlignment="Center" Width="120"/>
+            <PasswordBox x:Name="ApiKeyBox" Width="240"/>
+            <Button x:Name="SaveKeyButton" Content="Save" Margin="8,0,0,0" Click="SaveKeyButton_Click"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Audio device:" VerticalAlignment="Center" Width="120"/>
+            <ComboBox x:Name="DeviceCombo" Width="240"/>
+            <Button x:Name="RefreshDevicesButton" Content="Refresh" Margin="8,0,0,0" Click="RefreshDevicesButton_Click"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Sensitivity:" VerticalAlignment="Center" Width="120"/>
+            <Slider x:Name="SensitivitySlider" Width="240" Minimum="0.002" Maximum="0.08" Value="0.02" TickFrequency="0.002"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button x:Name="StartStopButton" Content="Start Listening" Width="140" Click="StartStopButton_Click"/>
+            <CheckBox x:Name="ShowOverlayCheck" Content="Show overlay captions" Margin="16,0,0,0"
+                      VerticalAlignment="Center" IsChecked="True"
+                      Checked="ShowOverlayCheck_Changed" Unchecked="ShowOverlayCheck_Changed"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="4" x:Name="StatusText" Text="Status: idle" Margin="0,0,0,8" Foreground="Gray"/>
+
+        <ListBox Grid.Row="5" x:Name="CaptionList" Margin="0,0,0,8" DisplayMemberPath="Display"/>
+
+        <TextBlock Grid.Row="6" TextWrapping="Wrap" Foreground="Gray" FontSize="11"
+                   Text="Hotkeys: Ctrl+Alt+O shows/hides the overlay. Ctrl+Alt+L unlocks it so you can drag it to a new spot (locked = click-through, so it never blocks game input). Tip: if you want to capture only FiveM (not Discord/Spotify), route FiveM's audio to its own output device, e.g. a virtual audio cable, and select that device above."/>
+    </Grid>
+</Window>
