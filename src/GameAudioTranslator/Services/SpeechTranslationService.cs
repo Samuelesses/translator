@@ -1,7 +1,9 @@
 using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,43 +16,37 @@ public class SpeechTranslationException : Exception
     }
 }
 
+public record Transcription(string? Language, string? Text);
+
 /// <summary>
-/// Talks to OpenAI's Whisper endpoints. Language detection and translation
-/// are two separate calls because the audio/translations endpoint's
-/// "language" field always reports "english" (the output language) - it
-/// never tells you what was actually spoken. So callers first ask
-/// audio/transcriptions (with auto language detection) what language a
-/// segment is in, and only then ask audio/translations for the English text.
+/// Talks to OpenAI's Whisper and Chat Completions endpoints.
+///
+/// Translation deliberately does NOT use Whisper's own audio/translations
+/// endpoint: in practice it's unreliable on short, noisy, radio-filtered
+/// game voice chat - it frequently just transcribes instead of translating,
+/// or mixes languages. Instead this transcribes in the original language
+/// (audio/transcriptions, which also reports the detected language) and
+/// then translates that text with a chat model, which handles casual/slangy
+/// speech far more reliably than Whisper's built-in translation head.
 /// </summary>
 public class SpeechTranslationService
 {
     private const string TranscriptionsEndpoint = "https://api.openai.com/v1/audio/transcriptions";
-    private const string TranslationsEndpoint = "https://api.openai.com/v1/audio/translations";
+    private const string ChatCompletionsEndpoint = "https://api.openai.com/v1/chat/completions";
+    private const string ChatModel = "gpt-4o-mini";
+
+    private const string TranslationSystemPrompt =
+        "You are a translation engine for live game voice chat. Translate the user's message into " +
+        "natural, colloquial English, preserving tone and slang where possible. Output ONLY the " +
+        "translation - no quotes, no notes, no explanations.";
 
     private static readonly HttpClient Http = new()
     {
         Timeout = TimeSpan.FromSeconds(30)
     };
 
-    /// <returns>The detected spoken language (e.g. "english", "spanish"), or null if it couldn't be determined.</returns>
-    public async Task<string?> DetectLanguageAsync(byte[] wavBytes, string apiKey, CancellationToken ct = default)
-    {
-        var body = await PostAudioAsync(TranscriptionsEndpoint, wavBytes, "verbose_json", apiKey, ct).ConfigureAwait(false);
-
-        using var doc = JsonDocument.Parse(body);
-        return doc.RootElement.TryGetProperty("language", out var langProp) ? langProp.GetString() : null;
-    }
-
-    /// <returns>The English translation of the speech in the segment, or null if none was returned.</returns>
-    public async Task<string?> TranslateToEnglishAsync(byte[] wavBytes, string apiKey, CancellationToken ct = default)
-    {
-        var body = await PostAudioAsync(TranslationsEndpoint, wavBytes, "json", apiKey, ct).ConfigureAwait(false);
-
-        using var doc = JsonDocument.Parse(body);
-        return doc.RootElement.TryGetProperty("text", out var textProp) ? textProp.GetString() : null;
-    }
-
-    private static async Task<string> PostAudioAsync(string endpoint, byte[] wavBytes, string responseFormat, string apiKey, CancellationToken ct)
+    /// <summary>Transcribes a segment in its original language and reports what language that was.</summary>
+    public async Task<Transcription> TranscribeAsync(byte[] wavBytes, string apiKey, CancellationToken ct = default)
     {
         using var content = new MultipartFormDataContent();
 
@@ -58,9 +54,9 @@ public class SpeechTranslationService
         audioContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
         content.Add(audioContent, "file", "segment.wav");
         content.Add(new StringContent("whisper-1"), "model");
-        content.Add(new StringContent(responseFormat), "response_format");
+        content.Add(new StringContent("verbose_json"), "response_format");
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = content };
+        using var request = new HttpRequestMessage(HttpMethod.Post, TranscriptionsEndpoint) { Content = content };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
         using var response = await Http.SendAsync(request, ct).ConfigureAwait(false);
@@ -71,7 +67,48 @@ public class SpeechTranslationService
             throw new SpeechTranslationException($"OpenAI API error ({(int)response.StatusCode}): {ExtractErrorMessage(body)}");
         }
 
-        return body;
+        using var doc = JsonDocument.Parse(body);
+        string? language = doc.RootElement.TryGetProperty("language", out var langProp) ? langProp.GetString() : null;
+        string? text = doc.RootElement.TryGetProperty("text", out var textProp) ? textProp.GetString() : null;
+        return new Transcription(language, text);
+    }
+
+    /// <returns>The English translation of <paramref name="sourceText"/>, or null if none was returned.</returns>
+    public async Task<string?> TranslateTextAsync(string sourceText, string apiKey, CancellationToken ct = default)
+    {
+        var requestBody = new JsonObject
+        {
+            ["model"] = ChatModel,
+            ["temperature"] = 0.2,
+            ["messages"] = new JsonArray
+            {
+                new JsonObject { ["role"] = "system", ["content"] = TranslationSystemPrompt },
+                new JsonObject { ["role"] = "user", ["content"] = sourceText }
+            }
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, ChatCompletionsEndpoint)
+        {
+            Content = new StringContent(requestBody.ToJsonString(), Encoding.UTF8, "application/json")
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        using var response = await Http.SendAsync(request, ct).ConfigureAwait(false);
+        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new SpeechTranslationException($"OpenAI API error ({(int)response.StatusCode}): {ExtractErrorMessage(body)}");
+        }
+
+        using var doc = JsonDocument.Parse(body);
+        var choices = doc.RootElement.GetProperty("choices");
+        if (choices.GetArrayLength() == 0)
+        {
+            return null;
+        }
+
+        return choices[0].GetProperty("message").GetProperty("content").GetString();
     }
 
     private static string ExtractErrorMessage(string body)

@@ -6,8 +6,8 @@ using NAudio.Wave;
 namespace GameAudioTranslator.Services;
 
 /// <summary>
-/// Serializes captured audio segments through language detection + translation
-/// so captions are produced (and can be displayed) in the order they were
+/// Serializes captured audio segments through transcription + translation so
+/// captions are produced (and can be displayed) in the order they were
 /// spoken. English speech is filtered out here - only non-English segments
 /// (the ones actually worth subtitling) reach <c>onCaption</c>.
 /// </summary>
@@ -41,16 +41,22 @@ public class SegmentProcessor
             {
                 var wav = AudioConverter.ConvertToWav16kMono(item.Data, item.Format);
 
-                var language = await _translationService.DetectLanguageAsync(wav, item.ApiKey).ConfigureAwait(false);
-                if (string.Equals(language, "english", StringComparison.OrdinalIgnoreCase))
+                var transcription = await _translationService.TranscribeAsync(wav, item.ApiKey).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(transcription.Text))
+                {
+                    continue; // Nothing intelligible in this segment.
+                }
+
+                if (string.Equals(transcription.Language, "english", StringComparison.OrdinalIgnoreCase))
                 {
                     continue; // Already understood - nothing to subtitle.
                 }
 
-                var text = await _translationService.TranslateToEnglishAsync(wav, item.ApiKey).ConfigureAwait(false);
-                if (!string.IsNullOrWhiteSpace(text))
+                var englishText = await _translationService.TranslateTextAsync(transcription.Text, item.ApiKey).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(englishText))
                 {
-                    _onCaption(string.IsNullOrWhiteSpace(language) ? "Unknown" : language, text.Trim());
+                    var language = string.IsNullOrWhiteSpace(transcription.Language) ? "Unknown" : transcription.Language;
+                    _onCaption(language, englishText.Trim());
                 }
             }
             catch (Exception ex)

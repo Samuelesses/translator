@@ -15,12 +15,17 @@ translating English back into English.
 2. **Segment** — A simple energy-based voice activity detector chunks the
    audio into individual utterances (it waits for a pause in speech, or a
    15s cap, before cutting a segment).
-3. **Detect language** — Each segment is sent to OpenAI's
-   `audio/transcriptions` endpoint (`whisper-1`, auto language detection)
-   to identify what language was spoken. English segments stop here and
-   are discarded — nothing to translate.
-4. **Translate** — Non-English segments are then sent to the
-   `audio/translations` endpoint, which produces the English text.
+3. **Transcribe & detect language** — Each segment is sent to OpenAI's
+   `audio/transcriptions` endpoint (`whisper-1`, auto language detection),
+   which returns both the detected language and the text in that original
+   language. English segments stop here and are discarded — nothing to
+   translate.
+4. **Translate** — Non-English text is translated to English with a chat
+   model (`gpt-4o-mini`), not Whisper's own `audio/translations` endpoint -
+   that endpoint turned out to be unreliable on short, noisy, radio-filtered
+   game voice chat (it would often just transcribe instead of translating).
+   Text-to-text translation with a chat model handles casual/slangy speech
+   far more consistently.
 5. **Display** — The English text appears as a subtitle-style overlay on
    top of your game (transparent, click-through, always-on-top) labeled
    with the detected language, and in a log in the app's main window.
@@ -113,10 +118,9 @@ raise it.
   `%AppData%\GameAudioTranslator\settings.json` — never committed anywhere
   or sent anywhere except as the `Authorization` header of the OpenAI
   request.
-- Whisper API usage is billed by OpenAI per minute of audio processed.
-  Each segment costs one `audio/transcriptions` call for language
-  detection; non-English segments cost a second `audio/translations` call
-  on top of that for the English text.
+- Every segment costs one `audio/transcriptions` call (billed per minute of
+  audio); non-English segments cost a second, much cheaper text-based
+  `chat/completions` call (`gpt-4o-mini`) for the English translation.
 
 ## Project layout
 
