@@ -33,7 +33,10 @@ public class SpeechTranslationService
 {
     private const string TranscriptionsEndpoint = "https://api.openai.com/v1/audio/transcriptions";
     private const string ChatCompletionsEndpoint = "https://api.openai.com/v1/chat/completions";
+    private const string SpeechEndpoint = "https://api.openai.com/v1/audio/speech";
     private const string ChatModel = "gpt-4o-mini";
+    private const string TtsModel = "tts-1";
+    private const string TtsVoice = "alloy";
 
     private const string TranslationSystemPromptTemplate =
         "You are a translation engine for live game voice chat. Translate the user's message into " +
@@ -114,6 +117,34 @@ public class SpeechTranslationService
         }
 
         return choices[0].GetProperty("message").GetProperty("content").GetString();
+    }
+
+    /// <returns>A WAV file (with header) of <paramref name="text"/> spoken aloud, via OpenAI's TTS.</returns>
+    public async Task<byte[]> TextToSpeechAsync(string text, string apiKey, CancellationToken ct = default)
+    {
+        var requestBody = new JsonObject
+        {
+            ["model"] = TtsModel,
+            ["voice"] = TtsVoice,
+            ["input"] = text,
+            ["response_format"] = "wav"
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, SpeechEndpoint)
+        {
+            Content = new StringContent(requestBody.ToJsonString(), Encoding.UTF8, "application/json")
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        using var response = await Http.SendAsync(request, ct).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            throw new SpeechTranslationException($"OpenAI API error ({(int)response.StatusCode}): {ExtractErrorMessage(errorBody)}");
+        }
+
+        return await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
     }
 
     private static string ExtractErrorMessage(string body)

@@ -112,7 +112,8 @@ Ctrl+Alt+R lets you talk back: it records your microphone, transcribes
 your English speech, translates it into whichever language the app most
 recently heard (shown live as "Last language heard" under the status
 line), and speaks the translation out loud through your speakers using
-Windows' built-in text-to-speech voices.
+OpenAI's TTS API (`tts-1`) — natural-sounding speech in any language
+automatically, no Windows voice packs or setup required.
 
 This is **local playback only** — it plays through your speakers for you
 to hear and repeat, it does not inject audio into your microphone or game
@@ -120,13 +121,6 @@ voice chat. Getting synthesized audio into another program's voice chat
 would require a virtual audio device (the same thing tools like SoundPad
 quietly install under the hood - there's no way around it for any app),
 which this project deliberately doesn't require you to install.
-
-Windows only ships non-English voices if you've added the matching
-language pack (**Settings > Time & Language > Speech > Add voices**). If
-no voice matches the target language, the status line says so and falls
-back to your default voice, which will mispronounce non-Latin-script
-languages especially. Nothing crashes or hangs either way - you'll just
-know which mode it used.
 
 ### Tuning detection
 
@@ -147,6 +141,8 @@ raise it.
 - Every segment costs one `audio/transcriptions` call (billed per minute of
   audio); non-English segments cost a second, much cheaper text-based
   `chat/completions` call (`gpt-4o-mini`) for the English translation.
+  Using Ctrl+Alt+R also costs one `audio/transcriptions` call, one
+  `chat/completions` call, and one `audio/speech` (TTS) call per reply.
 
 ## Project layout
 
@@ -168,7 +164,7 @@ src/GameAudioTranslator/
     HotkeyManager.cs         global hotkeys (RegisterHotKey)
     WindowInterop.cs         click-through window style toggling
     MicRecorderService.cs    records your real microphone for the reply feature
-    ReplyVoiceService.cs     local text-to-speech playback (Windows SAPI voices)
+    ReplyVoiceService.cs     local text-to-speech playback (OpenAI TTS)
     Interop/CoreAudioInterop.cs  raw P/Invoke for the Process Loopback API
     Interop/ActivateAudioInterfaceCompletionHandler.cs  async activation callback
 ```

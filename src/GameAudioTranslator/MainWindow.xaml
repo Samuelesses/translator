@@ -63,6 +63,6 @@
         <ListBox Grid.Row="7" x:Name="CaptionList" Margin="0,0,0,8" DisplayMemberPath="Display"/>
 
         <TextBlock Grid.Row="8" TextWrapping="Wrap" Foreground="Gray" FontSize="11"
-                   Text="Only non-English speech is subtitled; each line is labeled with the language spoken. Hotkeys: Ctrl+Alt+O shows/hides the overlay. Ctrl+Alt+L unlocks it to drag it (locked = click-through). Ctrl+Alt+R records your mic - press again to stop, translate to the last language heard, and speak it back through your speakers (Windows' built-in voice - install a language pack in Settings for accurate non-English pronunciation, or it'll fall back to the default voice). 'A specific application' isolates just that app's audio (needs Windows 10 2004+/11); pick FiveM once it's running, then Refresh if it's not listed yet."/>
+                   Text="Only non-English speech is subtitled; each line is labeled with the language spoken. Hotkeys: Ctrl+Alt+O shows/hides the overlay. Ctrl+Alt+L unlocks it to drag it (locked = click-through). Ctrl+Alt+R records your mic - press again to stop, translate to the last language heard, and speak it back through your speakers via OpenAI TTS. 'A specific application' isolates just that app's audio (needs Windows 10 2004+/11); pick FiveM once it's running, then Refresh if it's not listed yet."/>
     </Grid>
 </Window>

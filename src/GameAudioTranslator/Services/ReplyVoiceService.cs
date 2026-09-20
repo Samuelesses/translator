@@ -1,78 +1,69 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Speech.Synthesis;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using NAudio.Wave;
 
 namespace GameAudioTranslator.Services;
 
 /// <summary>
 /// Speaks translated text out loud locally (through the default speaker)
-/// using Windows' built-in SAPI voices - no cloud call, no extra install.
-/// Non-English languages only sound right if a matching voice/language pack
-/// is installed (Settings > Time & Language > Speech); otherwise this falls
-/// back to whatever voice Windows has by default, which will mispronounce
-/// non-English text. <see cref="Speak"/> reports which happened so the UI
-/// can tell the user instead of leaving it a silent surprise.
+/// using OpenAI's TTS API - reliable, natural-sounding speech in any
+/// language automatically, unlike Windows' built-in voices which only cover
+/// languages you've separately installed a pack for.
 /// </summary>
 public class ReplyVoiceService : IDisposable
 {
-    private static readonly Dictionary<string, string> LanguageToIsoCode = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["english"] = "en", ["spanish"] = "es", ["french"] = "fr", ["german"] = "de",
-        ["italian"] = "it", ["portuguese"] = "pt", ["russian"] = "ru", ["japanese"] = "ja",
-        ["korean"] = "ko", ["chinese"] = "zh", ["arabic"] = "ar", ["dutch"] = "nl",
-        ["polish"] = "pl", ["turkish"] = "tr", ["vietnamese"] = "vi", ["thai"] = "th",
-        ["hindi"] = "hi", ["swedish"] = "sv", ["norwegian"] = "no", ["danish"] = "da",
-        ["finnish"] = "fi", ["greek"] = "el", ["hebrew"] = "he", ["hungarian"] = "hu",
-        ["czech"] = "cs", ["romanian"] = "ro", ["ukrainian"] = "uk", ["indonesian"] = "id",
-        ["malay"] = "ms", ["tagalog"] = "tl", ["croatian"] = "hr", ["slovak"] = "sk",
-        ["bulgarian"] = "bg", ["catalan"] = "ca", ["welsh"] = "cy"
-    };
+    private readonly SpeechTranslationService _translationService;
+    private WaveOutEvent? _player;
+    private MemoryStream? _playbackStream;
+    private WaveFileReader? _playbackReader;
 
-    private readonly SpeechSynthesizer _synth = new();
-
-    public ReplyVoiceService()
+    public ReplyVoiceService(SpeechTranslationService translationService)
     {
-        _synth.SetOutputToDefaultAudioDevice();
+        _translationService = translationService;
     }
 
-    /// <returns>true if a voice matching the requested language was found and used; false if it fell back to the default voice.</returns>
-    public bool Speak(string text, string languageName)
+    public async Task SpeakAsync(string text, string apiKey, CancellationToken ct = default)
     {
-        bool matched = TrySelectVoice(languageName);
-        _synth.SpeakAsync(text);
-        return matched;
+        var wavBytes = await _translationService.TextToSpeechAsync(text, apiKey, ct).ConfigureAwait(false);
+
+        StopPlayback();
+
+        var stream = new MemoryStream(wavBytes);
+        var reader = new WaveFileReader(stream);
+        var player = new WaveOutEvent();
+        player.Init(reader);
+
+        _playbackStream = stream;
+        _playbackReader = reader;
+        _player = player;
+
+        player.Play();
     }
 
-    private bool TrySelectVoice(string languageName)
+    private void StopPlayback()
     {
-        if (!LanguageToIsoCode.TryGetValue(languageName, out var iso))
-        {
-            return false;
-        }
-
         try
         {
-            var match = _synth.GetInstalledVoices()
-                .FirstOrDefault(v => v.Enabled &&
-                    v.VoiceInfo.Culture.TwoLetterISOLanguageName.Equals(iso, StringComparison.OrdinalIgnoreCase));
-
-            if (match != null)
-            {
-                _synth.SelectVoice(match.VoiceInfo.Name);
-                return true;
-            }
+            _player?.Stop();
         }
         catch
         {
-            // Leave whatever voice is currently selected.
+            // Best-effort.
         }
 
-        return false;
+        _player?.Dispose();
+        _playbackReader?.Dispose();
+        _playbackStream?.Dispose();
+
+        _player = null;
+        _playbackReader = null;
+        _playbackStream = null;
     }
 
     public void Dispose()
     {
-        _synth.Dispose();
+        StopPlayback();
     }
 }

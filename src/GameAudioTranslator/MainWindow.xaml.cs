@@ -22,7 +22,7 @@ public partial class MainWindow : Window
     private readonly SpeechTranslationService _translationService = new();
     private readonly SegmentProcessor _segmentProcessor;
     private readonly MicRecorderService _micRecorder = new();
-    private readonly ReplyVoiceService _replyVoice = new();
+    private readonly ReplyVoiceService _replyVoice;
     private readonly AppSettings _settings = SettingsStore.Load();
 
     private OverlayWindow? _overlay;
@@ -40,6 +40,7 @@ public partial class MainWindow : Window
         DeviceCombo.ItemsSource = _devices;
         ProcessCombo.ItemsSource = _processes;
         _segmentProcessor = new SegmentProcessor(_translationService, OnCaptionReady, OnProcessingError);
+        _replyVoice = new ReplyVoiceService(_translationService);
 
         _deviceCaptureService.SegmentReady += OnSegmentReady;
         _deviceCaptureService.StatusChanged += OnCaptureStatus;
@@ -377,10 +378,9 @@ public partial class MainWindow : Window
                 return;
             }
 
-            bool voiceMatched = _replyVoice.Speak(translated, targetLanguage);
-            StatusText.Text = voiceMatched
-                ? $"Status: speaking reply in {Capitalize(targetLanguage)}"
-                : $"Status: speaking reply (no {Capitalize(targetLanguage)} voice installed - using default voice, pronunciation may be off)";
+            StatusText.Text = $"Status: generating speech in {Capitalize(targetLanguage)}...";
+            await _replyVoice.SpeakAsync(translated, _apiKey);
+            StatusText.Text = $"Status: spoke reply in {Capitalize(targetLanguage)}";
         }
         catch (Exception ex)
         {
