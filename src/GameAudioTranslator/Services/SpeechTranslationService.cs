@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using NAudio.Wave;
 
 namespace GameAudioTranslator.Services;
 
@@ -119,7 +120,17 @@ public class SpeechTranslationService
         return choices[0].GetProperty("message").GetProperty("content").GetString();
     }
 
-    /// <returns>A WAV file (with header) of <paramref name="text"/> spoken aloud, via OpenAI's TTS.</returns>
+    /// <summary>PCM format of the audio returned by <see cref="TextToSpeechAsync"/>: 24kHz, 16-bit signed, mono.</summary>
+    public static readonly WaveFormat SpeechPcmFormat = new(24000, 16, 1);
+
+    /// <returns>Raw PCM audio (see <see cref="SpeechPcmFormat"/>) of <paramref name="text"/> spoken aloud, via OpenAI's TTS.</returns>
+    /// <remarks>
+    /// Requests "pcm" rather than "wav": OpenAI streams this response, so the WAV
+    /// container's declared data-length header field isn't reliably the true final
+    /// size, which trips up strict WAV parsers like NAudio's WaveFileReader ("Stream
+    /// length must be non-negative..."). Raw PCM has no header to get wrong - the
+    /// caller just needs to already know the fixed format above.
+    /// </remarks>
     public async Task<byte[]> TextToSpeechAsync(string text, string apiKey, CancellationToken ct = default)
     {
         var requestBody = new JsonObject
@@ -127,7 +138,7 @@ public class SpeechTranslationService
             ["model"] = TtsModel,
             ["voice"] = TtsVoice,
             ["input"] = text,
-            ["response_format"] = "wav"
+            ["response_format"] = "pcm"
         };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, SpeechEndpoint)

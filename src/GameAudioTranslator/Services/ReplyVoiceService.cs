@@ -17,7 +17,7 @@ public class ReplyVoiceService : IDisposable
     private readonly SpeechTranslationService _translationService;
     private WaveOutEvent? _player;
     private MemoryStream? _playbackStream;
-    private WaveFileReader? _playbackReader;
+    private RawSourceWaveStream? _playbackReader;
 
     public ReplyVoiceService(SpeechTranslationService translationService)
     {
@@ -26,12 +26,12 @@ public class ReplyVoiceService : IDisposable
 
     public async Task SpeakAsync(string text, string apiKey, CancellationToken ct = default)
     {
-        var wavBytes = await _translationService.TextToSpeechAsync(text, apiKey, ct).ConfigureAwait(false);
+        var pcmBytes = await _translationService.TextToSpeechAsync(text, apiKey, ct).ConfigureAwait(false);
 
         StopPlayback();
 
-        var stream = new MemoryStream(wavBytes);
-        var reader = new WaveFileReader(stream);
+        var stream = new MemoryStream(pcmBytes);
+        var reader = new RawSourceWaveStream(stream, SpeechTranslationService.SpeechPcmFormat);
         var player = new WaveOutEvent();
         player.Init(reader);
 
