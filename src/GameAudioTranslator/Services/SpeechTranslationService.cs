@@ -35,9 +35,9 @@ public class SpeechTranslationService
     private const string ChatCompletionsEndpoint = "https://api.openai.com/v1/chat/completions";
     private const string ChatModel = "gpt-4o-mini";
 
-    private const string TranslationSystemPrompt =
+    private const string TranslationSystemPromptTemplate =
         "You are a translation engine for live game voice chat. Translate the user's message into " +
-        "natural, colloquial English, preserving tone and slang where possible. Output ONLY the " +
+        "natural, colloquial {0}, preserving tone and slang where possible. Output ONLY the " +
         "translation - no quotes, no notes, no explanations.";
 
     private static readonly HttpClient Http = new()
@@ -46,7 +46,8 @@ public class SpeechTranslationService
     };
 
     /// <summary>Transcribes a segment in its original language and reports what language that was.</summary>
-    public async Task<Transcription> TranscribeAsync(byte[] wavBytes, string apiKey, CancellationToken ct = default)
+    /// <param name="languageHint">Optional ISO-639-1 code (e.g. "en") if you already know the spoken language - improves accuracy/speed.</param>
+    public async Task<Transcription> TranscribeAsync(byte[] wavBytes, string apiKey, string? languageHint = null, CancellationToken ct = default)
     {
         using var content = new MultipartFormDataContent();
 
@@ -55,6 +56,10 @@ public class SpeechTranslationService
         content.Add(audioContent, "file", "segment.wav");
         content.Add(new StringContent("whisper-1"), "model");
         content.Add(new StringContent("verbose_json"), "response_format");
+        if (!string.IsNullOrEmpty(languageHint))
+        {
+            content.Add(new StringContent(languageHint), "language");
+        }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, TranscriptionsEndpoint) { Content = content };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
@@ -73,8 +78,8 @@ public class SpeechTranslationService
         return new Transcription(language, text);
     }
 
-    /// <returns>The English translation of <paramref name="sourceText"/>, or null if none was returned.</returns>
-    public async Task<string?> TranslateTextAsync(string sourceText, string apiKey, CancellationToken ct = default)
+    /// <returns>The translation of <paramref name="sourceText"/> into <paramref name="targetLanguage"/> (e.g. "english", "spanish"), or null if none was returned.</returns>
+    public async Task<string?> TranslateTextAsync(string sourceText, string targetLanguage, string apiKey, CancellationToken ct = default)
     {
         var requestBody = new JsonObject
         {
@@ -82,7 +87,7 @@ public class SpeechTranslationService
             ["temperature"] = 0.2,
             ["messages"] = new JsonArray
             {
-                new JsonObject { ["role"] = "system", ["content"] = TranslationSystemPrompt },
+                new JsonObject { ["role"] = "system", ["content"] = string.Format(TranslationSystemPromptTemplate, targetLanguage) },
                 new JsonObject { ["role"] = "user", ["content"] = sourceText }
             }
         };

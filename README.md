@@ -76,10 +76,14 @@ The output lands in
      This captures only FiveM's audio, nothing else on your PC.
 3. Click **Start Listening**. Play FiveM normally — translated lines will
    appear both in the app's log and as an overlay over your game.
-4. Overlay hotkeys (work even while the game has focus):
+4. Hotkeys (work even while the game has focus):
    - **Ctrl+Alt+O** — show/hide the overlay
    - **Ctrl+Alt+L** — unlock the overlay so you can drag it somewhere else
      on screen; press it again to lock it back into click-through mode
+   - **Ctrl+Alt+R** — reply: press once to start recording your mic, speak
+     your reply in English, press again to stop. It's translated into
+     whatever language was last heard and spoken out loud through your
+     speakers so you can hear and repeat it (see "Replying" below).
 
 ### Capturing a specific application
 
@@ -101,6 +105,28 @@ audio output to that virtual device in Windows' volume mixer or FiveM's
 own audio settings, and select that virtual device under "This device's
 audio". You'll still want your normal speakers as your main default
 device for everything else.
+
+### Replying
+
+Ctrl+Alt+R lets you talk back: it records your microphone, transcribes
+your English speech, translates it into whichever language the app most
+recently heard (shown live as "Last language heard" under the status
+line), and speaks the translation out loud through your speakers using
+Windows' built-in text-to-speech voices.
+
+This is **local playback only** — it plays through your speakers for you
+to hear and repeat, it does not inject audio into your microphone or game
+voice chat. Getting synthesized audio into another program's voice chat
+would require a virtual audio device (the same thing tools like SoundPad
+quietly install under the hood - there's no way around it for any app),
+which this project deliberately doesn't require you to install.
+
+Windows only ships non-English voices if you've added the matching
+language pack (**Settings > Time & Language > Speech > Add voices**). If
+no voice matches the target language, the status line says so and falls
+back to your default voice, which will mispronounce non-Latin-script
+languages especially. Nothing crashes or hangs either way - you'll just
+know which mode it used.
 
 ### Tuning detection
 
@@ -141,6 +167,8 @@ src/GameAudioTranslator/
     SettingsStore.cs         load/save settings, DPAPI-encrypt the API key
     HotkeyManager.cs         global hotkeys (RegisterHotKey)
     WindowInterop.cs         click-through window style toggling
+    MicRecorderService.cs    records your real microphone for the reply feature
+    ReplyVoiceService.cs     local text-to-speech playback (Windows SAPI voices)
     Interop/CoreAudioInterop.cs  raw P/Invoke for the Process Loopback API
     Interop/ActivateAudioInterfaceCompletionHandler.cs  async activation callback
 ```

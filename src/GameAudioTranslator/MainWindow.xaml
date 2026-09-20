@@ -55,11 +55,14 @@
                       Checked="ShowOverlayCheck_Changed" Unchecked="ShowOverlayCheck_Changed"/>
         </StackPanel>
 
-        <TextBlock Grid.Row="6" x:Name="StatusText" Text="Status: idle" Margin="0,0,0,8" Foreground="Gray"/>
+        <StackPanel Grid.Row="6" Margin="0,0,0,8">
+            <TextBlock x:Name="StatusText" Text="Status: idle" Foreground="Gray"/>
+            <TextBlock x:Name="LastLanguageText" Text="Last language heard: none yet" Foreground="Gray" FontSize="11" Margin="0,2,0,0"/>
+        </StackPanel>
 
         <ListBox Grid.Row="7" x:Name="CaptionList" Margin="0,0,0,8" DisplayMemberPath="Display"/>
 
         <TextBlock Grid.Row="8" TextWrapping="Wrap" Foreground="Gray" FontSize="11"
-                   Text="Only non-English speech is subtitled (English audio is detected and skipped automatically); each line is labeled with the language spoken. Hotkeys: Ctrl+Alt+O shows/hides the overlay. Ctrl+Alt+L unlocks it so you can drag it to a new spot (locked = click-through, so it never blocks game input). 'A specific application' isolates just that app's audio (needs Windows 10 2004+/11); pick FiveM once it's running, then Refresh if it's not listed yet."/>
+                   Text="Only non-English speech is subtitled; each line is labeled with the language spoken. Hotkeys: Ctrl+Alt+O shows/hides the overlay. Ctrl+Alt+L unlocks it to drag it (locked = click-through). Ctrl+Alt+R records your mic - press again to stop, translate to the last language heard, and speak it back through your speakers (Windows' built-in voice - install a language pack in Settings for accurate non-English pronunciation, or it'll fall back to the default voice). 'A specific application' isolates just that app's audio (needs Windows 10 2004+/11); pick FiveM once it's running, then Refresh if it's not listed yet."/>
     </Grid>
 </Window>

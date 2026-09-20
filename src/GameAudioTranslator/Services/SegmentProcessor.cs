@@ -52,7 +52,7 @@ public class SegmentProcessor
                     continue; // Already understood - nothing to subtitle.
                 }
 
-                var englishText = await _translationService.TranslateTextAsync(transcription.Text, item.ApiKey).ConfigureAwait(false);
+                var englishText = await _translationService.TranslateTextAsync(transcription.Text, "english", item.ApiKey).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(englishText))
                 {
                     var language = string.IsNullOrWhiteSpace(transcription.Language) ? "Unknown" : transcription.Language;
