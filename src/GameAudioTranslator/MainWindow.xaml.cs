@@ -218,7 +218,6 @@ public partial class MainWindow : Window
     {
         _deviceCaptureService.Stop();
         _processCaptureService.Stop();
-        _activeSource = null;
         _isCapturing = false;
         StartStopButton.Content = "Start Listening";
         StatusText.Text = "Status: stopped";
