@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
@@ -60,14 +61,30 @@ public partial class MainWindow : Window
         _hotkeys = new HotkeyManager();
         _hotkeys.Register(this);
 
-        _hotkeys.RegisterHotkey(HotkeyManager.MOD_CONTROL | HotkeyManager.MOD_ALT,
-            (uint)KeyInterop.VirtualKeyFromKey(Key.O), ToggleOverlayVisibility);
+        var failed = new List<string>();
 
-        _hotkeys.RegisterHotkey(HotkeyManager.MOD_CONTROL | HotkeyManager.MOD_ALT,
-            (uint)KeyInterop.VirtualKeyFromKey(Key.L), ToggleOverlayLock);
+        if (!_hotkeys.RegisterHotkey(HotkeyManager.MOD_CONTROL | HotkeyManager.MOD_ALT,
+                (uint)KeyInterop.VirtualKeyFromKey(Key.O), ToggleOverlayVisibility))
+        {
+            failed.Add("Ctrl+Alt+O (show/hide overlay)");
+        }
 
-        _hotkeys.RegisterHotkey(HotkeyManager.MOD_CONTROL | HotkeyManager.MOD_ALT,
-            (uint)KeyInterop.VirtualKeyFromKey(Key.R), ToggleReplyRecording);
+        if (!_hotkeys.RegisterHotkey(HotkeyManager.MOD_CONTROL | HotkeyManager.MOD_ALT,
+                (uint)KeyInterop.VirtualKeyFromKey(Key.L), ToggleOverlayLock))
+        {
+            failed.Add("Ctrl+Alt+L (lock/unlock overlay)");
+        }
+
+        if (!_hotkeys.RegisterHotkey(HotkeyManager.MOD_CONTROL | HotkeyManager.MOD_ALT,
+                (uint)KeyInterop.VirtualKeyFromKey(Key.R), ToggleReplyRecording))
+        {
+            failed.Add("Ctrl+Alt+R (reply)");
+        }
+
+        if (failed.Count > 0)
+        {
+            StatusText.Text = $"Status: another app is already using {string.Join(", ", failed)} - that hotkey won't respond here until it's freed up";
+        }
     }
 
     private void LoadDevices()
