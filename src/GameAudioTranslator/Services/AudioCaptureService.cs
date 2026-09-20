@@ -7,29 +7,55 @@ using NAudio.Wave;
 namespace GameAudioTranslator.Services;
 
 /// <summary>
-/// Captures WASAPI loopback audio from a playback device and slices it into
-/// speech segments using simple energy-based voice activity detection.
+/// Captures WASAPI loopback audio from an entire playback device (i.e.
+/// everything audible through it) and slices it into speech segments.
 /// </summary>
-public class AudioCaptureService : IDisposable
+public class AudioCaptureService : IAudioSource, IDisposable
 {
-    private readonly object _lock = new();
-    private readonly List<byte> _segmentBuffer = new();
+    private readonly SpeechSegmenter _segmenter = new();
 
     private WasapiLoopbackCapture? _capture;
     private WaveFormat? _captureFormat;
-    private int _silenceMs;
-    private int _speechMs;
-    private bool _hasSpeech;
 
-    public double SilenceThresholdRms { get; set; } = 0.02;
-    public int SilenceDurationMs { get; set; } = 700;
-    public int MinSegmentMs { get; set; } = 500;
-    public int MaxSegmentMs { get; set; } = 15000;
+    public double SilenceThresholdRms
+    {
+        get => _segmenter.SilenceThresholdRms;
+        set => _segmenter.SilenceThresholdRms = value;
+    }
+
+    public int SilenceDurationMs
+    {
+        get => _segmenter.SilenceDurationMs;
+        set => _segmenter.SilenceDurationMs = value;
+    }
+
+    public int MinSegmentMs
+    {
+        get => _segmenter.MinSegmentMs;
+        set => _segmenter.MinSegmentMs = value;
+    }
+
+    public int MaxSegmentMs
+    {
+        get => _segmenter.MaxSegmentMs;
+        set => _segmenter.MaxSegmentMs = value;
+    }
 
     public bool IsCapturing => _capture != null;
 
     public event Action<byte[], WaveFormat>? SegmentReady;
     public event Action<string>? StatusChanged;
+
+    public AudioCaptureService()
+    {
+        _segmenter.SegmentReady += data =>
+        {
+            if (_captureFormat != null)
+            {
+                SegmentReady?.Invoke(data, _captureFormat);
+            }
+        };
+    }
 
     public static List<MMDevice> GetOutputDevices()
     {
@@ -43,14 +69,7 @@ public class AudioCaptureService : IDisposable
 
         _capture = device != null ? new WasapiLoopbackCapture(device) : new WasapiLoopbackCapture();
         _captureFormat = _capture.WaveFormat;
-
-        lock (_lock)
-        {
-            _segmentBuffer.Clear();
-            _hasSpeech = false;
-            _speechMs = 0;
-            _silenceMs = 0;
-        }
+        _segmenter.Reset();
 
         _capture.DataAvailable += OnDataAvailable;
         _capture.RecordingStopped += OnRecordingStopped;
@@ -79,7 +98,7 @@ public class AudioCaptureService : IDisposable
         }
 
         _capture = null;
-        FlushSegment(force: true);
+        _segmenter.Flush(force: true);
     }
 
     private void OnRecordingStopped(object? sender, StoppedEventArgs e)
@@ -92,128 +111,10 @@ public class AudioCaptureService : IDisposable
 
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
-        var format = _captureFormat;
-        if (format == null || e.BytesRecorded == 0)
+        if (_captureFormat != null)
         {
-            return;
+            _segmenter.AddSamples(e.Buffer, e.BytesRecorded, _captureFormat);
         }
-
-        double rms = ComputeRms(e.Buffer, e.BytesRecorded, format);
-        int chunkMs = (int)(e.BytesRecorded / (double)format.AverageBytesPerSecond * 1000);
-        bool isSpeech = rms >= SilenceThresholdRms;
-
-        lock (_lock)
-        {
-            if (isSpeech || _hasSpeech)
-            {
-                _segmentBuffer.AddRange(e.Buffer.Take(e.BytesRecorded));
-            }
-
-            if (isSpeech)
-            {
-                _hasSpeech = true;
-                _speechMs += chunkMs;
-                _silenceMs = 0;
-            }
-            else if (_hasSpeech)
-            {
-                _silenceMs += chunkMs;
-            }
-
-            bool reachedTrailingSilence = _hasSpeech && _silenceMs >= SilenceDurationMs && _speechMs >= MinSegmentMs;
-            bool reachedMaxLength = _hasSpeech && _speechMs >= MaxSegmentMs;
-
-            if (reachedTrailingSilence || reachedMaxLength)
-            {
-                FlushSegmentLocked();
-            }
-        }
-    }
-
-    private void FlushSegment(bool force)
-    {
-        lock (_lock)
-        {
-            if (force && _hasSpeech && _speechMs < MinSegmentMs)
-            {
-                // Too short to be worth transcribing; discard rather than force it through.
-                _segmentBuffer.Clear();
-                _hasSpeech = false;
-                _speechMs = 0;
-                _silenceMs = 0;
-                return;
-            }
-
-            FlushSegmentLocked();
-        }
-    }
-
-    /// <summary>Must be called with <see cref="_lock"/> held.</summary>
-    private void FlushSegmentLocked()
-    {
-        if (!_hasSpeech || _segmentBuffer.Count == 0)
-        {
-            _segmentBuffer.Clear();
-            _hasSpeech = false;
-            _speechMs = 0;
-            _silenceMs = 0;
-            return;
-        }
-
-        var data = _segmentBuffer.ToArray();
-        var format = _captureFormat;
-
-        _segmentBuffer.Clear();
-        _hasSpeech = false;
-        _speechMs = 0;
-        _silenceMs = 0;
-
-        if (format != null)
-        {
-            SegmentReady?.Invoke(data, format);
-        }
-    }
-
-    private static double ComputeRms(byte[] buffer, int bytesRecorded, WaveFormat format)
-    {
-        if (format.Encoding == WaveFormatEncoding.IeeeFloat && format.BitsPerSample == 32)
-        {
-            int sampleCount = bytesRecorded / 4;
-            if (sampleCount == 0)
-            {
-                return 0;
-            }
-
-            double sum = 0;
-            for (int i = 0; i < sampleCount; i++)
-            {
-                float sample = BitConverter.ToSingle(buffer, i * 4);
-                sum += sample * sample;
-            }
-
-            return Math.Sqrt(sum / sampleCount);
-        }
-
-        if (format.BitsPerSample == 16)
-        {
-            int sampleCount = bytesRecorded / 2;
-            if (sampleCount == 0)
-            {
-                return 0;
-            }
-
-            double sum = 0;
-            for (int i = 0; i < sampleCount; i++)
-            {
-                short sample = BitConverter.ToInt16(buffer, i * 2);
-                double f = sample / 32768.0;
-                sum += f * f;
-            }
-
-            return Math.Sqrt(sum / sampleCount);
-        }
-
-        return 0;
     }
 
     public void Dispose()

@@ -20,9 +20,10 @@ language you don't.
    top of your game (transparent, click-through, always-on-top), and in a
    log in the app's main window.
 
-This captures **whatever is playing through the selected output device**,
-not one specific application's audio — see "Isolating FiveM's audio" below
-if you want to avoid picking up Discord/Spotify/etc.
+You can choose **what** to capture: an entire playback device (everything
+audible through it), or **one specific running application** — e.g. just
+FiveM, ignoring Discord/Spotify/etc. entirely — via Windows' Process
+Loopback API (Windows 10 2004+ / Windows 11 only).
 
 ## Requirements
 
@@ -57,25 +58,38 @@ The output lands in
 
 1. Launch the app, paste your OpenAI API key, and click **Save** (it's
    encrypted at rest with Windows DPAPI, tied to your Windows user account).
-2. Pick an **audio device** — leave it on "Default playback device" unless
-   you've set up a dedicated device for the game (see below).
-3. Click **Start Listening**. Play FiveM (or anything else) normally —
-   translated lines will appear both in the app's log and as an overlay
-   over your game.
+2. Under **Capture from**, choose one:
+   - **This device's audio** — pick a playback device (leave it on
+     "Default playback device" unless you've set up a dedicated one), or
+   - **A specific application** — launch FiveM first, then pick it from
+     the **Application** dropdown (click Refresh if it's not listed yet).
+     This captures only FiveM's audio, nothing else on your PC.
+3. Click **Start Listening**. Play FiveM normally — translated lines will
+   appear both in the app's log and as an overlay over your game.
 4. Overlay hotkeys (work even while the game has focus):
    - **Ctrl+Alt+O** — show/hide the overlay
    - **Ctrl+Alt+L** — unlock the overlay so you can drag it somewhere else
      on screen; press it again to lock it back into click-through mode
 
-### Isolating FiveM's audio
+### Capturing a specific application
 
-WASAPI loopback captures everything going to the chosen output device.
-If you want to avoid transcribing Discord calls, Spotify, etc. alongside
-the game, install a virtual audio device such as
+"A specific application" uses Windows' Process Loopback API to isolate
+just that process's audio (and any child processes it spawns — so picking
+either FiveM's launcher or the game process itself works). It requires
+**Windows 10 build 19041 (the "May 2020 Update", 2004) or later, or
+Windows 11**; on older Windows it'll fail with an error in the status
+line — switch to "This device's audio" instead.
+
+The application picker only lists processes with a visible window (so
+background services don't clutter it) — make sure FiveM is running and
+its window is open before you click Refresh.
+
+If you'd rather isolate FiveM without this mode (e.g. on an older Windows
+build), install a virtual audio device such as
 [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) (free), set FiveM's
 audio output to that virtual device in Windows' volume mixer or FiveM's
-own audio settings, and select that virtual device in this app's device
-dropdown. You'll still want your normal speakers as your main default
+own audio settings, and select that virtual device under "This device's
+audio". You'll still want your normal speakers as your main default
 device for everything else.
 
 ### Tuning detection
@@ -103,15 +117,20 @@ src/GameAudioTranslator/
   App.xaml(.cs)              application entry point
   MainWindow.xaml(.cs)       control panel: API key, device picker, log
   OverlayWindow.xaml(.cs)    transparent click-through caption overlay
-  Models/                    AppSettings, CaptionLine, AudioDeviceOption
+  Models/                    AppSettings, CaptionLine, AudioDeviceOption, ProcessAudioSource
   Services/
-    AudioCaptureService.cs   WASAPI loopback capture + VAD segmentation
+    AudioCaptureService.cs   whole-device WASAPI loopback capture
+    ProcessLoopbackCaptureService.cs  per-application loopback capture (raw WASAPI/COM)
+    ProcessAudioSourceProvider.cs     lists running apps to capture from
+    SpeechSegmenter.cs       shared energy-based VAD segmentation
     AudioConverter.cs        resample captured audio to 16kHz mono WAV
     SpeechTranslationService.cs  OpenAI audio/translations client
     SegmentProcessor.cs      ordered pipeline: convert -> translate -> display
     SettingsStore.cs         load/save settings, DPAPI-encrypt the API key
     HotkeyManager.cs         global hotkeys (RegisterHotKey)
     WindowInterop.cs         click-through window style toggling
+    Interop/CoreAudioInterop.cs  raw P/Invoke for the Process Loopback API
+    Interop/ActivateAudioInterfaceCompletionHandler.cs  async activation callback
 ```
 
 ## Troubleshooting

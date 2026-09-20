@@ -13,7 +13,10 @@ public partial class MainWindow : Window
 {
     private readonly ObservableCollection<CaptionLine> _captions = new();
     private readonly ObservableCollection<AudioDeviceOption> _devices = new();
-    private readonly AudioCaptureService _captureService = new();
+    private readonly ObservableCollection<ProcessAudioSource> _processes = new();
+
+    private readonly AudioCaptureService _deviceCaptureService = new();
+    private readonly ProcessLoopbackCaptureService _processCaptureService = new();
     private readonly SpeechTranslationService _translationService = new();
     private readonly SegmentProcessor _segmentProcessor;
     private readonly AppSettings _settings = SettingsStore.Load();
@@ -29,12 +32,16 @@ public partial class MainWindow : Window
 
         CaptionList.ItemsSource = _captions;
         DeviceCombo.ItemsSource = _devices;
+        ProcessCombo.ItemsSource = _processes;
         _segmentProcessor = new SegmentProcessor(_translationService, OnCaptionReady, OnProcessingError);
 
-        _captureService.SegmentReady += OnSegmentReady;
-        _captureService.StatusChanged += OnCaptureStatus;
+        _deviceCaptureService.SegmentReady += OnSegmentReady;
+        _deviceCaptureService.StatusChanged += OnCaptureStatus;
+        _processCaptureService.SegmentReady += OnSegmentReady;
+        _processCaptureService.StatusChanged += OnCaptureStatus;
 
         LoadDevices();
+        LoadProcesses();
         LoadSettingsIntoUi();
 
         SourceInitialized += MainWindow_SourceInitialized;
@@ -73,6 +80,27 @@ public partial class MainWindow : Window
         DeviceCombo.SelectedItem = _devices.FirstOrDefault(d => d.Id == _settings.AudioDeviceId) ?? _devices[0];
     }
 
+    private void LoadProcesses()
+    {
+        _processes.Clear();
+
+        try
+        {
+            foreach (var process in ProcessAudioSourceProvider.GetCandidateProcesses())
+            {
+                _processes.Add(process);
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Status: couldn't list running applications ({ex.Message})";
+        }
+
+        var match = _processes.FirstOrDefault(p =>
+            string.Equals(p.ProcessName, _settings.TargetProcessName, StringComparison.OrdinalIgnoreCase));
+        ProcessCombo.SelectedItem = match ?? _processes.FirstOrDefault();
+    }
+
     private void LoadSettingsIntoUi()
     {
         SensitivitySlider.Value = _settings.SilenceThresholdRms;
@@ -80,6 +108,15 @@ public partial class MainWindow : Window
         if (!string.IsNullOrEmpty(_apiKey))
         {
             ApiKeyBox.Password = _apiKey;
+        }
+
+        if (_settings.CaptureMode == "Application")
+        {
+            AppModeRadio.IsChecked = true;
+        }
+        else
+        {
+            DeviceModeRadio.IsChecked = true;
         }
     }
 
@@ -92,6 +129,20 @@ public partial class MainWindow : Window
     }
 
     private void RefreshDevicesButton_Click(object sender, RoutedEventArgs e) => LoadDevices();
+
+    private void RefreshProcessesButton_Click(object sender, RoutedEventArgs e) => LoadProcesses();
+
+    private void CaptureMode_Changed(object sender, RoutedEventArgs e)
+    {
+        if (DevicePanel == null || AppPanel == null)
+        {
+            return; // fires once during InitializeComponent before these are assigned
+        }
+
+        bool appMode = AppModeRadio.IsChecked == true;
+        DevicePanel.Visibility = appMode ? Visibility.Collapsed : Visibility.Visible;
+        AppPanel.Visibility = appMode ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     private void StartStopButton_Click(object sender, RoutedEventArgs e)
     {
@@ -114,22 +165,43 @@ public partial class MainWindow : Window
             return;
         }
 
-        var selected = DeviceCombo.SelectedItem as AudioDeviceOption;
-        _settings.AudioDeviceId = selected?.Id;
         _settings.SilenceThresholdRms = SensitivitySlider.Value;
-        SettingsStore.Save(_settings);
+        _deviceCaptureService.SilenceThresholdRms = SensitivitySlider.Value;
+        _processCaptureService.SilenceThresholdRms = SensitivitySlider.Value;
 
-        _captureService.SilenceThresholdRms = SensitivitySlider.Value;
-
-        try
+        if (AppModeRadio.IsChecked == true)
         {
-            _captureService.Start(selected?.Device);
+            var selected = ProcessCombo.SelectedItem as ProcessAudioSource;
+            if (selected == null)
+            {
+                MessageBox.Show("Pick a running application first (click Refresh if the list is empty - it only shows apps with a visible window).",
+                    "Game Audio Translator", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            _settings.CaptureMode = "Application";
+            _settings.TargetProcessName = selected.ProcessName;
+            SettingsStore.Save(_settings);
+
+            _processCaptureService.Start(selected.ProcessId, selected.DisplayName);
         }
-        catch (Exception ex)
+        else
         {
-            MessageBox.Show($"Couldn't start audio capture:\n{ex.Message}", "Game Audio Translator",
-                MessageBoxButton.OK, MessageBoxImage.Error);
-            return;
+            var selected = DeviceCombo.SelectedItem as AudioDeviceOption;
+            _settings.CaptureMode = "Device";
+            _settings.AudioDeviceId = selected?.Id;
+            SettingsStore.Save(_settings);
+
+            try
+            {
+                _deviceCaptureService.Start(selected?.Device);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Couldn't start audio capture:\n{ex.Message}", "Game Audio Translator",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
         }
 
         _isCapturing = true;
@@ -144,7 +216,9 @@ public partial class MainWindow : Window
 
     private void StopCapture()
     {
-        _captureService.Stop();
+        _deviceCaptureService.Stop();
+        _processCaptureService.Stop();
+        _activeSource = null;
         _isCapturing = false;
         StartStopButton.Content = "Start Listening";
         StatusText.Text = "Status: stopped";

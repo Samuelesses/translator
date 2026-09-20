@@ -1,10 +1,12 @@
 <Window x:Class="GameAudioTranslator.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Game Audio Translator" Height="600" Width="480"
-        MinHeight="520" MinWidth="420">
+        Title="Game Audio Translator" Height="660" Width="500"
+        MinHeight="580" MinWidth="440">
     <Grid Margin="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -20,29 +22,44 @@
             <Button x:Name="SaveKeyButton" Content="Save" Margin="8,0,0,0" Click="SaveKeyButton_Click"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
+            <TextBlock Text="Capture from:" VerticalAlignment="Center" Width="120"/>
+            <RadioButton x:Name="DeviceModeRadio" GroupName="CaptureMode" Content="This device's audio"
+                         IsChecked="True" VerticalAlignment="Center" Margin="0,0,16,0"
+                         Checked="CaptureMode_Changed"/>
+            <RadioButton x:Name="AppModeRadio" GroupName="CaptureMode" Content="A specific application"
+                         VerticalAlignment="Center" Checked="CaptureMode_Changed"/>
+        </StackPanel>
+
+        <StackPanel x:Name="DevicePanel" Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
             <TextBlock Text="Audio device:" VerticalAlignment="Center" Width="120"/>
             <ComboBox x:Name="DeviceCombo" Width="240"/>
             <Button x:Name="RefreshDevicesButton" Content="Refresh" Margin="8,0,0,0" Click="RefreshDevicesButton_Click"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
+        <StackPanel x:Name="AppPanel" Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,8" Visibility="Collapsed">
+            <TextBlock Text="Application:" VerticalAlignment="Center" Width="120"/>
+            <ComboBox x:Name="ProcessCombo" Width="240"/>
+            <Button x:Name="RefreshProcessesButton" Content="Refresh" Margin="8,0,0,0" Click="RefreshProcessesButton_Click"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,0,0,8">
             <TextBlock Text="Sensitivity:" VerticalAlignment="Center" Width="120"/>
             <Slider x:Name="SensitivitySlider" Width="240" Minimum="0.002" Maximum="0.08" Value="0.02" TickFrequency="0.002"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,8">
+        <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,0,0,8">
             <Button x:Name="StartStopButton" Content="Start Listening" Width="140" Click="StartStopButton_Click"/>
             <CheckBox x:Name="ShowOverlayCheck" Content="Show overlay captions" Margin="16,0,0,0"
                       VerticalAlignment="Center" IsChecked="True"
                       Checked="ShowOverlayCheck_Changed" Unchecked="ShowOverlayCheck_Changed"/>
         </StackPanel>
 
-        <TextBlock Grid.Row="4" x:Name="StatusText" Text="Status: idle" Margin="0,0,0,8" Foreground="Gray"/>
+        <TextBlock Grid.Row="6" x:Name="StatusText" Text="Status: idle" Margin="0,0,0,8" Foreground="Gray"/>
 
-        <ListBox Grid.Row="5" x:Name="CaptionList" Margin="0,0,0,8" DisplayMemberPath="Display"/>
+        <ListBox Grid.Row="7" x:Name="CaptionList" Margin="0,0,0,8" DisplayMemberPath="Display"/>
 
-        <TextBlock Grid.Row="6" TextWrapping="Wrap" Foreground="Gray" FontSize="11"
-                   Text="Hotkeys: Ctrl+Alt+O shows/hides the overlay. Ctrl+Alt+L unlocks it so you can drag it to a new spot (locked = click-through, so it never blocks game input). Tip: if you want to capture only FiveM (not Discord/Spotify), route FiveM's audio to its own output device, e.g. a virtual audio cable, and select that device above."/>
+        <TextBlock Grid.Row="8" TextWrapping="Wrap" Foreground="Gray" FontSize="11"
+                   Text="Hotkeys: Ctrl+Alt+O shows/hides the overlay. Ctrl+Alt+L unlocks it so you can drag it to a new spot (locked = click-through, so it never blocks game input). 'A specific application' isolates just that app's audio (needs Windows 10 2004+/11); pick FiveM once it's running, then Refresh if it's not listed yet."/>
     </Grid>
 </Window>

@@ -4,6 +4,8 @@ public class AppSettings
 {
     public string? EncryptedApiKey { get; set; }
     public string? AudioDeviceId { get; set; }
+    public string CaptureMode { get; set; } = "Device"; // "Device" or "Application"
+    public string? TargetProcessName { get; set; }
     public double SilenceThresholdRms { get; set; } = 0.02;
     public int SilenceDurationMs { get; set; } = 700;
     public int MinSegmentMs { get; set; } = 500;
