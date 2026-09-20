@@ -15,19 +15,42 @@ public class SpeechTranslationException : Exception
 }
 
 /// <summary>
-/// Sends audio to the OpenAI audio translations endpoint, which transcribes
-/// speech in any supported language directly into English text.
+/// Talks to OpenAI's Whisper endpoints. Language detection and translation
+/// are two separate calls because the audio/translations endpoint's
+/// "language" field always reports "english" (the output language) - it
+/// never tells you what was actually spoken. So callers first ask
+/// audio/transcriptions (with auto language detection) what language a
+/// segment is in, and only then ask audio/translations for the English text.
 /// </summary>
 public class SpeechTranslationService
 {
-    private const string Endpoint = "https://api.openai.com/v1/audio/translations";
+    private const string TranscriptionsEndpoint = "https://api.openai.com/v1/audio/transcriptions";
+    private const string TranslationsEndpoint = "https://api.openai.com/v1/audio/translations";
 
     private static readonly HttpClient Http = new()
     {
         Timeout = TimeSpan.FromSeconds(30)
     };
 
+    /// <returns>The detected spoken language (e.g. "english", "spanish"), or null if it couldn't be determined.</returns>
+    public async Task<string?> DetectLanguageAsync(byte[] wavBytes, string apiKey, CancellationToken ct = default)
+    {
+        var body = await PostAudioAsync(TranscriptionsEndpoint, wavBytes, "verbose_json", apiKey, ct).ConfigureAwait(false);
+
+        using var doc = JsonDocument.Parse(body);
+        return doc.RootElement.TryGetProperty("language", out var langProp) ? langProp.GetString() : null;
+    }
+
+    /// <returns>The English translation of the speech in the segment, or null if none was returned.</returns>
     public async Task<string?> TranslateToEnglishAsync(byte[] wavBytes, string apiKey, CancellationToken ct = default)
+    {
+        var body = await PostAudioAsync(TranslationsEndpoint, wavBytes, "json", apiKey, ct).ConfigureAwait(false);
+
+        using var doc = JsonDocument.Parse(body);
+        return doc.RootElement.TryGetProperty("text", out var textProp) ? textProp.GetString() : null;
+    }
+
+    private static async Task<string> PostAudioAsync(string endpoint, byte[] wavBytes, string responseFormat, string apiKey, CancellationToken ct)
     {
         using var content = new MultipartFormDataContent();
 
@@ -35,9 +58,9 @@ public class SpeechTranslationService
         audioContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
         content.Add(audioContent, "file", "segment.wav");
         content.Add(new StringContent("whisper-1"), "model");
-        content.Add(new StringContent("json"), "response_format");
+        content.Add(new StringContent(responseFormat), "response_format");
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint) { Content = content };
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = content };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
         using var response = await Http.SendAsync(request, ct).ConfigureAwait(false);
@@ -48,8 +71,7 @@ public class SpeechTranslationService
             throw new SpeechTranslationException($"OpenAI API error ({(int)response.StatusCode}): {ExtractErrorMessage(body)}");
         }
 
-        using var doc = JsonDocument.Parse(body);
-        return doc.RootElement.TryGetProperty("text", out var textProp) ? textProp.GetString() : null;
+        return body;
     }
 
     private static string ExtractErrorMessage(string body)

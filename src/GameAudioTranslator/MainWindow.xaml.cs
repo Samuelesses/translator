@@ -231,11 +231,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnCaptionReady(string text)
+    private void OnCaptionReady(string language, string text)
     {
         Dispatcher.Invoke(() =>
         {
-            var line = new CaptionLine { Text = text, Timestamp = DateTime.Now };
+            var line = new CaptionLine { Text = text, Language = language, Timestamp = DateTime.Now };
             _captions.Add(line);
             while (_captions.Count > 50)
             {

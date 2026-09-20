@@ -3,7 +3,9 @@
 A Windows desktop app that listens to your game's audio (or any playback
 device) and shows a live English translation of what's being said, as an
 on-screen overlay — handy for games like FiveM where other players speak a
-language you don't.
+language you don't. Only non-English speech gets subtitled; each line is
+tagged with the language it detected, so it doesn't clutter your screen
+translating English back into English.
 
 ## How it works
 
@@ -13,12 +15,15 @@ language you don't.
 2. **Segment** — A simple energy-based voice activity detector chunks the
    audio into individual utterances (it waits for a pause in speech, or a
    15s cap, before cutting a segment).
-3. **Translate** — Each segment is sent to OpenAI's `audio/translations`
-   endpoint (`whisper-1`), which transcribes speech in *any* language
-   directly into English text in one step.
-4. **Display** — The English text appears as a subtitle-style overlay on
-   top of your game (transparent, click-through, always-on-top), and in a
-   log in the app's main window.
+3. **Detect language** — Each segment is sent to OpenAI's
+   `audio/transcriptions` endpoint (`whisper-1`, auto language detection)
+   to identify what language was spoken. English segments stop here and
+   are discarded — nothing to translate.
+4. **Translate** — Non-English segments are then sent to the
+   `audio/translations` endpoint, which produces the English text.
+5. **Display** — The English text appears as a subtitle-style overlay on
+   top of your game (transparent, click-through, always-on-top) labeled
+   with the detected language, and in a log in the app's main window.
 
 You can choose **what** to capture: an entire playback device (everything
 audible through it), or **one specific running application** — e.g. just
@@ -109,6 +114,9 @@ raise it.
   or sent anywhere except as the `Authorization` header of the OpenAI
   request.
 - Whisper API usage is billed by OpenAI per minute of audio processed.
+  Each segment costs one `audio/transcriptions` call for language
+  detection; non-English segments cost a second `audio/translations` call
+  on top of that for the English text.
 
 ## Project layout
 

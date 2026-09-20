@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -45,13 +46,27 @@ public partial class OverlayWindow : Window
     {
         var text = new TextBlock
         {
-            Text = line.Text,
-            Foreground = Brushes.White,
-            FontSize = 20,
-            FontWeight = FontWeights.SemiBold,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 2, 0, 2)
         };
+
+        if (!string.IsNullOrEmpty(line.DisplayLanguage))
+        {
+            text.Inlines.Add(new Run($"{line.DisplayLanguage}: ")
+            {
+                FontStyle = FontStyles.Italic,
+                FontSize = 14,
+                Foreground = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC))
+            });
+        }
+
+        text.Inlines.Add(new Run(line.Text)
+        {
+            Foreground = Brushes.White,
+            FontSize = 20,
+            FontWeight = FontWeights.SemiBold
+        });
+
         LinesPanel.Children.Add(text);
 
         while (LinesPanel.Children.Count > MaxLines)
