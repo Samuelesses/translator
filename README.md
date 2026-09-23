@@ -179,6 +179,19 @@ OpenAI's normalized TTS output — turn it up if you sound quiet compared
 to replies, down if you're clipping/distorting. Adjustable live while
 passthrough is running.
 
+**A note on real-time audio**: this passes your mic through a live mixing
+pipeline with no signed low-level driver to lean on, so it's inherently a
+tradeoff between latency and glitch-resistance - a buffer big enough to
+never stutter will always add some delay, and one tuned for near-zero
+delay will occasionally underrun (a brief dropout) whenever your PC hiccups
+even slightly. The pipeline resamples audio only once (right before it
+reaches the virtual cable, not at intermediate steps) to minimize how many
+places jitter can turn into audible glitches, and uses event-driven capture
+for steadier timing - but on constrained hardware or a loaded PC, brief
+dropouts can still happen. This is a fundamentally hard problem for any
+software-only virtual mic (dedicated tools like VoiceMeeter exist because
+of exactly this).
+
 ### Tuning detection
 
 The **Sensitivity** slider sets the volume (RMS) threshold above which
