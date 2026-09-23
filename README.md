@@ -111,8 +111,16 @@ The **Reply** panel lets you talk back. Click **Start Reply** (or press
 changes to "■ Stop Reply" so it's obvious it's listening. Speak your
 reply in English, then click it again (or press the hotkey again) to
 stop. While it processes, the button shows "Working..." and is disabled
-so you can't double-trigger it; the status line tracks each step
-(transcribing → translating → generating speech).
+so you can't double-trigger it; the status line tracks each step and
+shows exactly what it heard you say ("heard '...' - translating to...")
+before translating, so if the transcription is wrong you'll see why
+(wrong mic selected, too quiet, cut off) instead of just getting a
+strange-sounding reply with no explanation.
+
+It records from the **Microphone** device picked in the Voice Output
+panel below (default: your system's default microphone) - if replies
+keep coming out garbled or as random short words, check that's actually
+the mic you're talking into.
 
 The reply is translated into whichever language the app most recently
 heard (shown live as "Last language heard" above the button) and spoken

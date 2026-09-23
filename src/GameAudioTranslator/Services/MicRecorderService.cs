@@ -7,9 +7,9 @@ using NAudio.Wave;
 namespace GameAudioTranslator.Services;
 
 /// <summary>
-/// Records from the system's default real microphone (not loopback) while
-/// active, for the "speak an English reply" feature. Unrelated to the game
-/// audio capture services, which read the opposite direction (playback).
+/// Records from a real microphone (not loopback) while active, for the
+/// "speak an English reply" feature. Unrelated to the game audio capture
+/// services, which read the opposite direction (playback).
 /// </summary>
 public class MicRecorderService : IDisposable
 {
@@ -21,11 +21,12 @@ public class MicRecorderService : IDisposable
 
     public bool IsRecording => _capture != null;
 
-    public void Start()
+    /// <param name="device">Which microphone to record from; null uses the system default.</param>
+    public void Start(MMDevice? device = null)
     {
         Stop();
 
-        _capture = new WasapiCapture();
+        _capture = device != null ? new WasapiCapture(device) : new WasapiCapture();
         _format = _capture.WaveFormat;
 
         lock (_lock)

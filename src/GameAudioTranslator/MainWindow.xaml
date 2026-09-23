@@ -90,6 +90,7 @@
                     <ComboBox x:Name="MicCombo" Width="240"/>
                     <Button x:Name="RefreshMicsButton" Content="Refresh" Margin="8,0,0,0" Click="RefreshMicsButton_Click"/>
                 </StackPanel>
+                <TextBlock Text="This microphone is also what Reply (above) records from." Foreground="Gray" FontSize="11" Margin="0,-4,0,8"/>
 
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="Virtual cable:" VerticalAlignment="Center" Width="120"/>

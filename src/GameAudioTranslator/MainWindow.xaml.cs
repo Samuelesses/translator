@@ -475,7 +475,8 @@ public partial class MainWindow : Window
 
         try
         {
-            _micRecorder.Start();
+            var mic = MicCombo.SelectedItem as AudioDeviceOption;
+            _micRecorder.Start(mic?.Device);
         }
         catch (Exception ex)
         {
@@ -517,7 +518,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            StatusText.Text = $"Status: translating to {Capitalize(targetLanguage)}...";
+            StatusText.Text = $"Status: heard \"{transcription.Text}\" - translating to {Capitalize(targetLanguage)}...";
             var translated = await _translationService.TranslateTextAsync(transcription.Text, targetLanguage, _apiKey);
 
             if (string.IsNullOrWhiteSpace(translated))
@@ -528,7 +529,7 @@ public partial class MainWindow : Window
 
             StatusText.Text = $"Status: generating speech in {Capitalize(targetLanguage)}...";
             await _replyVoice.SpeakAsync(translated, _apiKey, _settings.ReplySpeechSpeed);
-            StatusText.Text = $"Status: spoke reply in {Capitalize(targetLanguage)}";
+            StatusText.Text = $"Status: spoke \"{translated}\" in {Capitalize(targetLanguage)}";
             ReplayButton.IsEnabled = true;
         }
         catch (Exception ex)
