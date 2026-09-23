@@ -128,12 +128,42 @@ packs or setup required.
   the TTS API again. It's disabled until you've successfully generated
   at least one reply.
 
-This is **local playback only** — it plays through your speakers for you
-to hear and repeat, it does not inject audio into your microphone or game
-voice chat. Getting synthesized audio into another program's voice chat
-would require a virtual audio device (the same thing tools like SoundPad
-quietly install under the hood - there's no way around it for any app),
-which this project deliberately doesn't require you to install.
+The reply always plays locally through your speakers so you can hear it.
+If you also want other players to actually hear it through FiveM's voice
+chat, see **Voice Output** below.
+
+### Voice Output — let other players hear you
+
+By default this app only reads game audio; it doesn't touch your
+microphone or FiveM's voice chat at all. The **Voice Output** panel adds
+that, optionally:
+
+1. Install a free virtual audio cable, e.g.
+   [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) — this creates a
+   paired device ("CABLE Input" / "CABLE Output"). This is required and
+   can't be avoided: there's no way for *any* Windows app, including this
+   one, to feed audio into another program's microphone input without a
+   virtual device backing it. (SoundPad and similar tools quietly install
+   the same kind of driver themselves; this project just doesn't hide
+   that step from you.)
+2. In FiveM (or Discord, etc.), set your **microphone/voice input** to
+   "CABLE Output (VB-Audio Virtual Cable)".
+3. In this app's **Voice Output** panel, pick your real **Microphone**
+   and set **Virtual cable** to "CABLE Input (VB-Audio Virtual Cable)",
+   then check **Enable virtual mic passthrough**.
+
+Once enabled, the app continuously mixes your real microphone into the
+virtual cable in real time, so you keep talking normally exactly as
+before — FiveM just hears it via the virtual device now instead of your
+mic directly. When you use **Reply** (Ctrl+Alt+R) while passthrough is
+on, the translated speech is mixed into that same stream too, so other
+players hear your reply, in addition to it playing on your own speakers
+for you to follow along.
+
+Voice Output is off by default and has to be explicitly enabled each
+session — it deliberately doesn't auto-start, since silently rerouting
+your microphone on launch would be a bad surprise. Leave it off if you
+only want the subtitle/translation features.
 
 ### Tuning detection
 
@@ -178,6 +208,7 @@ src/GameAudioTranslator/
     WindowInterop.cs         click-through window style toggling
     MicRecorderService.cs    records your real microphone for the reply feature
     ReplyVoiceService.cs     local text-to-speech playback (OpenAI TTS)
+    VirtualMicMixerService.cs  real-time mic + reply mixing into a virtual audio cable
     Interop/CoreAudioInterop.cs  raw P/Invoke for the Process Loopback API
     Interop/ActivateAudioInterfaceCompletionHandler.cs  async activation callback
 ```
@@ -194,3 +225,13 @@ src/GameAudioTranslator/
 - **API errors in the status line**: usually an invalid/expired key,
   no remaining quota, or a network issue — the message includes OpenAI's
   error detail.
+- **Voice Output: hearing an echo/loud feedback**: you picked your real
+  speakers as the "Virtual cable" device by mistake instead of the
+  virtual cable's input — that loops your live mic back out through your
+  speakers. Uncheck **Enable virtual mic passthrough** immediately and
+  re-pick the correct device (it should have "Cable"/"Virtual" in its
+  name, not your speaker/headphone model).
+- **Voice Output: FiveM doesn't hear anything**: confirm FiveM's own
+  microphone setting is the virtual cable's *output* side (e.g. "CABLE
+  Output"), not its input side, and that passthrough is enabled here
+  with the matching *input* side selected as "Virtual cable".

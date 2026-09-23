@@ -1,10 +1,11 @@
 <Window x:Class="GameAudioTranslator.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Game Audio Translator" Height="760" Width="520"
-        MinHeight="640" MinWidth="460">
+        Title="Game Audio Translator" Height="880" Width="520"
+        MinHeight="700" MinWidth="460">
     <Grid Margin="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -76,11 +77,33 @@
             </StackPanel>
         </GroupBox>
 
-        <TextBlock Grid.Row="3" x:Name="StatusText" Text="Status: idle" Margin="0,0,0,8" Foreground="Gray"/>
+        <GroupBox Grid.Row="3" Header="Voice Output (let others hear you)" Margin="0,0,0,8">
+            <StackPanel Margin="6">
+                <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,0,0,8"
+                           Text="Lets FiveM voice chat hear your real voice plus your translated replies. Requires installing a free virtual audio cable first (e.g. VB-Audio Virtual Cable) and setting FiveM's microphone to its output device - this app can't create that device itself, no app can."/>
 
-        <ListBox Grid.Row="4" x:Name="CaptionList" Margin="0,0,0,8" DisplayMemberPath="Display"/>
+                <CheckBox x:Name="VoicePassthroughCheck" Content="Enable virtual mic passthrough" Margin="0,0,0,8"
+                          Checked="VoicePassthroughCheck_Changed" Unchecked="VoicePassthroughCheck_Changed"/>
 
-        <TextBlock Grid.Row="5" TextWrapping="Wrap" Foreground="Gray" FontSize="11"
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Microphone:" VerticalAlignment="Center" Width="120"/>
+                    <ComboBox x:Name="MicCombo" Width="240"/>
+                    <Button x:Name="RefreshMicsButton" Content="Refresh" Margin="8,0,0,0" Click="RefreshMicsButton_Click"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Virtual cable:" VerticalAlignment="Center" Width="120"/>
+                    <ComboBox x:Name="CableCombo" Width="240"/>
+                    <Button x:Name="RefreshCablesButton" Content="Refresh" Margin="8,0,0,0" Click="RefreshCablesButton_Click"/>
+                </StackPanel>
+            </StackPanel>
+        </GroupBox>
+
+        <TextBlock Grid.Row="4" x:Name="StatusText" Text="Status: idle" Margin="0,0,0,8" Foreground="Gray"/>
+
+        <ListBox Grid.Row="5" x:Name="CaptionList" Margin="0,0,0,8" DisplayMemberPath="Display"/>
+
+        <TextBlock Grid.Row="6" TextWrapping="Wrap" Foreground="Gray" FontSize="11"
                    Text="Ctrl+Alt+O shows/hides the overlay; Ctrl+Alt+L unlocks it to drag (locked = click-through). 'A specific application' needs Windows 10 2004+/11 - pick FiveM once it's running, then Refresh if it's not listed yet."/>
     </Grid>
 </Window>

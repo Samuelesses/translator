@@ -23,6 +23,9 @@ public class ReplyVoiceService : IDisposable
     /// <summary>True once at least one reply has been generated and can be replayed without another API call.</summary>
     public bool HasReply => _lastPcmBytes != null;
 
+    /// <summary>Fires with the raw PCM bytes whenever a reply is generated - lets a voice mixer inject the same audio elsewhere.</summary>
+    public event Action<byte[]>? ReplyGenerated;
+
     public ReplyVoiceService(SpeechTranslationService translationService)
     {
         _translationService = translationService;
@@ -33,6 +36,7 @@ public class ReplyVoiceService : IDisposable
     {
         var pcmBytes = await _translationService.TextToSpeechAsync(text, apiKey, speed, ct).ConfigureAwait(false);
         _lastPcmBytes = pcmBytes;
+        ReplyGenerated?.Invoke(pcmBytes);
         Play(pcmBytes);
     }
 

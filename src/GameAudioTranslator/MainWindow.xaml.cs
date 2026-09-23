@@ -21,6 +21,8 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<CaptionLine> _captions = new();
     private readonly ObservableCollection<AudioDeviceOption> _devices = new();
     private readonly ObservableCollection<ProcessAudioSource> _processes = new();
+    private readonly ObservableCollection<AudioDeviceOption> _mics = new();
+    private readonly ObservableCollection<AudioDeviceOption> _cables = new();
 
     private readonly AudioCaptureService _deviceCaptureService = new();
     private readonly ProcessLoopbackCaptureService _processCaptureService = new();
@@ -28,6 +30,7 @@ public partial class MainWindow : Window
     private readonly SegmentProcessor _segmentProcessor;
     private readonly MicRecorderService _micRecorder = new();
     private readonly ReplyVoiceService _replyVoice;
+    private readonly VirtualMicMixerService _voiceMixer = new();
     private readonly AppSettings _settings = SettingsStore.Load();
 
     private OverlayWindow? _overlay;
@@ -44,16 +47,22 @@ public partial class MainWindow : Window
         CaptionList.ItemsSource = _captions;
         DeviceCombo.ItemsSource = _devices;
         ProcessCombo.ItemsSource = _processes;
+        MicCombo.ItemsSource = _mics;
+        CableCombo.ItemsSource = _cables;
         _segmentProcessor = new SegmentProcessor(_translationService, OnCaptionReady, OnProcessingError);
         _replyVoice = new ReplyVoiceService(_translationService);
+        _replyVoice.ReplyGenerated += _voiceMixer.InjectReply;
 
         _deviceCaptureService.SegmentReady += OnSegmentReady;
         _deviceCaptureService.StatusChanged += OnCaptureStatus;
         _processCaptureService.SegmentReady += OnSegmentReady;
         _processCaptureService.StatusChanged += OnCaptureStatus;
+        _voiceMixer.StatusChanged += OnCaptureStatus;
 
         LoadDevices();
         LoadProcesses();
+        LoadMics();
+        LoadCables();
         LoadSettingsIntoUi();
 
         SourceInitialized += MainWindow_SourceInitialized;
@@ -130,6 +139,92 @@ public partial class MainWindow : Window
         var match = _processes.FirstOrDefault(p =>
             string.Equals(p.ProcessName, _settings.TargetProcessName, StringComparison.OrdinalIgnoreCase));
         ProcessCombo.SelectedItem = match ?? _processes.FirstOrDefault();
+    }
+
+    private void LoadMics()
+    {
+        _mics.Clear();
+        _mics.Add(new AudioDeviceOption("Default microphone", null));
+
+        try
+        {
+            foreach (var device in VirtualMicMixerService.GetMicrophoneDevices())
+            {
+                _mics.Add(new AudioDeviceOption(device.FriendlyName, device));
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Status: couldn't list microphones ({ex.Message})";
+        }
+
+        MicCombo.SelectedItem = _mics.FirstOrDefault(d => d.Id == _settings.MicDeviceId) ?? _mics[0];
+    }
+
+    private void LoadCables()
+    {
+        _cables.Clear();
+
+        try
+        {
+            foreach (var device in AudioCaptureService.GetOutputDevices())
+            {
+                _cables.Add(new AudioDeviceOption(device.FriendlyName, device));
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Status: couldn't list playback devices ({ex.Message})";
+        }
+
+        // No default selection - picking the wrong device here (e.g. your real speakers)
+        // would loop your mic into them, so only pre-select a previously chosen one.
+        var match = _cables.FirstOrDefault(d => d.Id == _settings.VirtualCableDeviceId);
+        if (match != null)
+        {
+            CableCombo.SelectedItem = match;
+        }
+    }
+
+    private void RefreshMicsButton_Click(object sender, RoutedEventArgs e) => LoadMics();
+
+    private void RefreshCablesButton_Click(object sender, RoutedEventArgs e) => LoadCables();
+
+    private void VoicePassthroughCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        if (VoicePassthroughCheck.IsChecked == true)
+        {
+            StartVoicePassthrough();
+        }
+        else
+        {
+            _voiceMixer.Stop();
+        }
+    }
+
+    private void StartVoicePassthrough()
+    {
+        var cable = CableCombo.SelectedItem as AudioDeviceOption;
+        if (cable?.Device == null)
+        {
+            MessageBox.Show(
+                "Pick your virtual cable's input device first (e.g. \"CABLE Input (VB-Audio Virtual Cable)\") - " +
+                "install one from vb-audio.com/Cable if you haven't already.",
+                "Game Audio Translator", MessageBoxButton.OK, MessageBoxImage.Warning);
+            VoicePassthroughCheck.IsChecked = false;
+            return;
+        }
+
+        var mic = MicCombo.SelectedItem as AudioDeviceOption;
+
+        _settings.MicDeviceId = mic?.Id;
+        _settings.VirtualCableDeviceId = cable.Id;
+        SettingsStore.Save(_settings);
+
+        if (!_voiceMixer.Start(mic?.Device, cable.Device))
+        {
+            VoicePassthroughCheck.IsChecked = false;
+        }
     }
 
     private void LoadSettingsIntoUi()
@@ -453,6 +548,7 @@ public partial class MainWindow : Window
         StopCapture();
         _micRecorder.Dispose();
         _replyVoice.Dispose();
+        _voiceMixer.Dispose();
         _hotkeys?.Dispose();
         _overlay?.Close();
         SettingsStore.Save(_settings);
