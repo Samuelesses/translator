@@ -173,12 +173,36 @@ session — it deliberately doesn't auto-start, since silently rerouting
 your microphone on launch would be a bad surprise. Leave it off if you
 only want the subtitle/translation features.
 
+**Mic boost** (1.0x–4.0x, default 2.0x) applies gain to your mic before
+it's mixed with the reply, since a raw mic signal is often quieter than
+OpenAI's normalized TTS output — turn it up if you sound quiet compared
+to replies, down if you're clipping/distorting. Adjustable live while
+passthrough is running.
+
 ### Tuning detection
 
 The **Sensitivity** slider sets the volume (RMS) threshold above which
 audio is treated as speech vs. silence. If lines are getting cut short or
 missed, lower it; if background noise/music is triggering false segments,
 raise it.
+
+### Reducing subtitle delay
+
+Two things affect how quickly a caption appears after someone stops
+talking:
+
+- The app waits ~400ms of silence after speech before treating a segment
+  as finished (long enough to avoid cutting off mid-sentence pauses,
+  short enough to feel responsive). This isn't currently exposed as a
+  setting.
+- Up to 3 segments are transcribed/translated concurrently, so when
+  multiple people talk in quick succession, later lines don't keep
+  queuing up behind earlier ones - each caption appears as soon as its
+  own segment finishes, not strictly in speaking order.
+
+The rest of the delay is inherent: the OpenAI API round-trip(s) for
+transcription and translation, which depend on your connection and
+OpenAI's current load.
 
 ## Privacy & cost notes
 

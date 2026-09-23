@@ -23,9 +23,19 @@ public class VirtualMicMixerService : IDisposable
 {
     private static readonly WaveFormat MixFormat = WaveFormat.CreateIeeeFloatWaveFormat(48000, 1);
 
+    // NAudio's BufferedWaveProvider defaults to a 5-second internal buffer. Left uncapped,
+    // any tiny clock drift between the mic's capture clock and the output device's playback
+    // clock lets it slowly fill up, which shows up as ever-growing passthrough delay. Capping
+    // it small (and discarding overflow) bounds the worst-case latency this stage can add.
+    private static readonly TimeSpan MicBufferDuration = TimeSpan.FromMilliseconds(200);
+    private static readonly TimeSpan ReplyBufferDuration = TimeSpan.FromSeconds(30);
+
+    private const float DefaultMicGain = 2.0f;
+
     private WasapiCapture? _micCapture;
     private BufferedWaveProvider? _micBuffer;
     private MediaFoundationResampler? _micResampler;
+    private VolumeSampleProvider? _micVolume;
     private BufferedWaveProvider? _replyBuffer;
     private MediaFoundationResampler? _replyResampler;
     private MediaFoundationResampler? _finalResampler;
@@ -42,25 +52,33 @@ public class VirtualMicMixerService : IDisposable
     }
 
     /// <returns>true if passthrough started successfully.</returns>
-    public bool Start(MMDevice? micDevice, MMDevice cableDevice)
+    public bool Start(MMDevice? micDevice, MMDevice cableDevice, float micGain = DefaultMicGain)
     {
         Stop();
 
         try
         {
             _micCapture = micDevice != null ? new WasapiCapture(micDevice) : new WasapiCapture();
-            _micBuffer = new BufferedWaveProvider(_micCapture.WaveFormat) { DiscardOnBufferOverflow = true };
+            _micBuffer = new BufferedWaveProvider(_micCapture.WaveFormat)
+            {
+                DiscardOnBufferOverflow = true,
+                BufferDuration = MicBufferDuration
+            };
             _micCapture.DataAvailable += OnMicDataAvailable;
 
             _micResampler = new MediaFoundationResampler(_micBuffer, MixFormat);
-            var micSampleProvider = _micResampler.ToSampleProvider();
+            _micVolume = new VolumeSampleProvider(_micResampler.ToSampleProvider()) { Volume = micGain };
 
-            _replyBuffer = new BufferedWaveProvider(SpeechTranslationService.SpeechPcmFormat) { DiscardOnBufferOverflow = true };
+            _replyBuffer = new BufferedWaveProvider(SpeechTranslationService.SpeechPcmFormat)
+            {
+                DiscardOnBufferOverflow = true,
+                BufferDuration = ReplyBufferDuration
+            };
             _replyResampler = new MediaFoundationResampler(_replyBuffer, MixFormat);
             var replySampleProvider = _replyResampler.ToSampleProvider();
 
             var mixer = new MixingSampleProvider(MixFormat) { ReadFully = true };
-            mixer.AddMixerInput(micSampleProvider);
+            mixer.AddMixerInput(_micVolume);
             mixer.AddMixerInput(replySampleProvider);
 
             IWaveProvider outputProvider = mixer.ToWaveProvider();
@@ -85,6 +103,15 @@ public class VirtualMicMixerService : IDisposable
             Stop();
             StatusChanged?.Invoke($"Couldn't start voice passthrough: {ex.Message}");
             return false;
+        }
+    }
+
+    /// <summary>Adjusts mic gain live while running. No-op if not running.</summary>
+    public void SetMicGain(float gain)
+    {
+        if (_micVolume != null)
+        {
+            _micVolume.Volume = gain;
         }
     }
 
@@ -135,6 +162,7 @@ public class VirtualMicMixerService : IDisposable
         _micCapture = null;
         _micBuffer = null;
         _micResampler = null;
+        _micVolume = null;
         _replyBuffer = null;
         _replyResampler = null;
         _finalResampler = null;

@@ -221,16 +221,30 @@ public partial class MainWindow : Window
         _settings.VirtualCableDeviceId = cable.Id;
         SettingsStore.Save(_settings);
 
-        if (!_voiceMixer.Start(mic?.Device, cable.Device))
+        if (!_voiceMixer.Start(mic?.Device, cable.Device, (float)MicGainSlider.Value))
         {
             VoicePassthroughCheck.IsChecked = false;
         }
+    }
+
+    private void MicGainSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (MicGainLabel == null)
+        {
+            return; // fires once during InitializeComponent before this is assigned
+        }
+
+        MicGainLabel.Text = $"{e.NewValue:0.0}x";
+        _settings.MicGain = e.NewValue;
+        SettingsStore.Save(_settings);
+        _voiceMixer.SetMicGain((float)e.NewValue);
     }
 
     private void LoadSettingsIntoUi()
     {
         SensitivitySlider.Value = _settings.SilenceThresholdRms;
         SpeechSpeedSlider.Value = _settings.ReplySpeechSpeed;
+        MicGainSlider.Value = _settings.MicGain;
         _apiKey = SettingsStore.DecryptApiKey(_settings.EncryptedApiKey);
         if (!string.IsNullOrEmpty(_apiKey))
         {

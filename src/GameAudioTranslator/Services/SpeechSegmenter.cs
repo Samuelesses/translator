@@ -21,8 +21,8 @@ public class SpeechSegmenter
     private int _silenceMs;
 
     public double SilenceThresholdRms { get; set; } = 0.02;
-    public int SilenceDurationMs { get; set; } = 700;
-    public int MinSegmentMs { get; set; } = 500;
+    public int SilenceDurationMs { get; set; } = 400;
+    public int MinSegmentMs { get; set; } = 400;
     public int MaxSegmentMs { get; set; } = 15000;
 
     public event Action<byte[]>? SegmentReady;

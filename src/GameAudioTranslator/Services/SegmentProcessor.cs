@@ -6,13 +6,18 @@ using NAudio.Wave;
 namespace GameAudioTranslator.Services;
 
 /// <summary>
-/// Serializes captured audio segments through transcription + translation so
-/// captions are produced (and can be displayed) in the order they were
-/// spoken. English speech is filtered out here - only non-English segments
-/// (the ones actually worth subtitling) reach <c>onCaption</c>.
+/// Runs captured audio segments through transcription + translation, up to
+/// <see cref="MaxConcurrency"/> at once, so back-to-back speech (multiple
+/// people talking in quick succession) doesn't queue up and make later
+/// captions lag further and further behind - each segment's captions land
+/// as soon as that segment finishes, not strictly in arrival order. English
+/// speech is filtered out here - only non-English segments (the ones
+/// actually worth subtitling) reach <c>onCaption</c>.
 /// </summary>
 public class SegmentProcessor
 {
+    private const int MaxConcurrency = 3;
+
     private readonly Channel<(byte[] Data, WaveFormat Format, string ApiKey)> _channel =
         Channel.CreateUnbounded<(byte[], WaveFormat, string)>();
 
@@ -35,24 +40,26 @@ public class SegmentProcessor
 
     private async Task ProcessLoopAsync()
     {
-        await foreach (var item in _channel.Reader.ReadAllAsync())
+        var options = new ParallelOptions { MaxDegreeOfParallelism = MaxConcurrency };
+
+        await Parallel.ForEachAsync(_channel.Reader.ReadAllAsync(), options, async (item, ct) =>
         {
             try
             {
                 var wav = AudioConverter.ConvertToWav16kMono(item.Data, item.Format);
 
-                var transcription = await _translationService.TranscribeAsync(wav, item.ApiKey).ConfigureAwait(false);
+                var transcription = await _translationService.TranscribeAsync(wav, item.ApiKey, ct: ct).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(transcription.Text))
                 {
-                    continue; // Nothing intelligible in this segment.
+                    return; // Nothing intelligible in this segment.
                 }
 
                 if (string.Equals(transcription.Language, "english", StringComparison.OrdinalIgnoreCase))
                 {
-                    continue; // Already understood - nothing to subtitle.
+                    return; // Already understood - nothing to subtitle.
                 }
 
-                var englishText = await _translationService.TranslateTextAsync(transcription.Text, "english", item.ApiKey).ConfigureAwait(false);
+                var englishText = await _translationService.TranslateTextAsync(transcription.Text, "english", item.ApiKey, ct).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(englishText))
                 {
                     var language = string.IsNullOrWhiteSpace(transcription.Language) ? "Unknown" : transcription.Language;
@@ -63,6 +70,6 @@ public class SegmentProcessor
             {
                 _onError(ex.Message);
             }
-        }
+        });
     }
 }

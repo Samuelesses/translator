@@ -92,10 +92,17 @@
                 </StackPanel>
                 <TextBlock Text="This microphone is also what Reply (above) records from." Foreground="Gray" FontSize="11" Margin="0,-4,0,8"/>
 
-                <StackPanel Orientation="Horizontal">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                     <TextBlock Text="Virtual cable:" VerticalAlignment="Center" Width="120"/>
                     <ComboBox x:Name="CableCombo" Width="240"/>
                     <Button x:Name="RefreshCablesButton" Content="Refresh" Margin="8,0,0,0" Click="RefreshCablesButton_Click"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Mic boost:" VerticalAlignment="Center" Width="120"/>
+                    <Slider x:Name="MicGainSlider" Width="200" Minimum="1.0" Maximum="4.0" Value="2.0"
+                            TickFrequency="0.1" ValueChanged="MicGainSlider_ValueChanged"/>
+                    <TextBlock x:Name="MicGainLabel" Text="2.0x" Width="40" Margin="8,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
             </StackPanel>
         </GroupBox>

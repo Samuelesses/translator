@@ -7,8 +7,8 @@ public class AppSettings
     public string CaptureMode { get; set; } = "Device"; // "Device" or "Application"
     public string? TargetProcessName { get; set; }
     public double SilenceThresholdRms { get; set; } = 0.02;
-    public int SilenceDurationMs { get; set; } = 700;
-    public int MinSegmentMs { get; set; } = 500;
+    public int SilenceDurationMs { get; set; } = 400;
+    public int MinSegmentMs { get; set; } = 400;
     public int MaxSegmentMs { get; set; } = 15000;
 
     public double OverlayLeft { get; set; }
@@ -19,4 +19,5 @@ public class AppSettings
 
     public string? MicDeviceId { get; set; }
     public string? VirtualCableDeviceId { get; set; }
+    public double MicGain { get; set; } = 2.0;
 }
